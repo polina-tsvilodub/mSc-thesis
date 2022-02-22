@@ -1,0 +1,9 @@
+data/
+*.aux
+*.bbl
+*.blg
+*.fff
+*.ttt
+*.log
+*.out
+*.synctex.gz
