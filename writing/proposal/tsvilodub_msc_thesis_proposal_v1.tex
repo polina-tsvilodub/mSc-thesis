@@ -1,0 +1,103 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{helvet}
+\pagestyle{empty}
+\usepackage[kerning=true]{microtype}
+\usepackage{parskip}
+\usepackage{sansmath}
+\usepackage{graphicx}
+\usepackage{sidecap}  
+\sidecaptionvpos{figure}{c}
+\usepackage{float}
+\usepackage{color, soul}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+% Feel free to use additional packages for glosses, figures, whatnot.
+\usepackage[dvipsnames]{xcolor}
+\newcommand{\mf}[1]{\textcolor{BurntOrange}{[MF: #1]}}
+\newcommand{\pt}[1]{\textcolor{Cerulean}{[PT: #1]}}
+\newcommand{\bvt}[1]{\textcolor{ForestGreen}{[EB: #1]}}
+% The next bit is for reserving sufficient space for authors,
+% affiliations, and e-mail address.  No need to change for initial
+% anonymous version.  For the final version, replace the
+%\toggletrue{anonymous} %with \togglefalse{anonymous} to de-anonymize.
+\usepackage{etoolbox}
+\newtoggle{anonymous}
+\togglefalse{anonymous}
+
+\renewcommand{\title}[1]{\textbf{#1}\\}
+\newcommand{\authors}[1]{\iftoggle{anonymous}{\phantom{#1}}{#1}\\}
+\newcommand{\email}[1]{\iftoggle{anonymous}{\phantom{#1}}{#1}}
+
+\begin{document}
+
+% First page:
+
+% Insert title, authors, affiliations, and e-mail address in the next three lines:
+
+\title{Combining natural language, realistic images, and multi-agent communication: MSc Thesis Proposal \newline}
+\authors{\textit{January 11th 2022} \newline \newline By Polina Tsvilodub (ptsvilodub@uos.de), Osnabr\"uck University }
+
+The following proposal draft outlines some ideas for my MSc thesis in the area of using natural language for describing realistic images in a multi-agent communication setting. The goal of this proposal is to summarize my ideas regarding the topic to facilitate the initial thesis planning and constraining the scope of the work. However, these are just rough ideas with remaining open questions, and I am completely open to improving these during the kick-off meeting. If possible, I would like to focus on acquiring methodological skills in using different deep learning visual and language modeling modules within this work. This focus has guided the ideas presented below.
+
+The proposal is structured as follows:
+
+(1) presents the ideas regarding the topic, a possible research question and methods in an abstract-style fashion. More specifically, the ideas so far are largely based on \textbf{comparing and combining aspects of work from these papers} (ordered by decreasing relevance): \cite{lazaridou2020multi, andreas2016reasoning, kim2021vilt}. 
+
+(2) presents a generic \textit{suggested thesis structure}, which will be adjusted and mapped to specific completion milestones and dates once the topic has been finalized. Nevertheless, I suggest three most important and already plannable dates below. Finally, if possible, I would also like to \textit{schedule monthly review meetings} to discuss the aforementioned milestones, once agreed upon (tbd). 
+
+\underline{Most important dates:}
+\begin{itemize}
+	\item Finalize thesis topic, structure and timeline by February 13th 2022
+	\item Finish thesis draft by August 1st 2022
+	\item Submit thesis by August 31st 2022
+\end{itemize}
+
+(3) summarizes two ideas that were not planned through at all yet, but which I would like to nevertheless share with you.
+
+(4) contains references.\newline
+
+
+\textbf{(1) Proposal:} The area of multi-agent communication has gained increased popularity both as a field for studying the mechanisms of language evolution, as well as as a field for developing potential human-machine communication architectures (e.g., \cite{lazaridou2020emergent}). In particular, multi-agent communication experiments employing communication in natural language bear great potential for developing easy to use and scalable human-machine interaction (e.g., \cite{andreas2016reasoning, mao2016generation, lazaridou2020multi, gupta2021dynamic}). 
+
+However, to my knowledge, multi-agent communication experiments employing natural language so far have been conducted on synthetic images with curated labels (e.g., the Abstract Scenes dataset, \cite{zitnick2013bringing}). Yet it is critical for potential applications to scale multi-agent communication to natural realistic visual input. Realistic visual input typically refers to natural photographic images, as opposed to synthetic ones, compiled and labelled in datasets like MS COCO (up to $\sim$five captions / image), Visual Genome, Google Conceptual Captions (one caption / image) etc \cite{krishna2017visual, sharma2018conceptual, lin2014microsoft}. 
+
+This kind of input has received increased attention in the area of image captioning from the computer vision perspective (e.g., \cite{kim2021vilt, su2019vl, lu2019vilbert} etc, among others). Moreover, some work has focused on training models to produce \textit{discriminative} image captions, which arguably are more cognitively plausible (\cite{andreas2016reasoning, dai2017contrastive, vedantam2017context, nie2020pragmatic}). That is, they focus on producing captions that would maximally aid a listener in retrieving a target image among distractors, for instance in a \textit{reference game} task. At the same time, this task has been a dominant traning paradigm in multi-agent communication experiments. Approaching the intersection of multi-agent communication and image captioning in natural language, in particular, \cite{lazaridou2020multi} train a model to generate discriminative image captions by training it in a multi-agent communication setting on synthetic images. Other multi-agent communication experiments have focused on other aspects like properties of the emergent communication protocols, the effects of different losses or experimental set-ups (e.g., \cite{lazaridou2018emergence, van2020grammar}).  
+
+The \textbf{goal of this thesis would be to extend existing work on multi-agent communication to agents generating pragmatic captions of realistic visual input} like the MS COCO Captions or the Flickr30k dataset \cite{lin2014microsoft, young2014image}, to move towards the goal of realistic human-machine communication about naturalistic environments, while employing a framework which potentially allows for listener-specific adaptation. Depending on the chosen models (see below), the final dataset choice might depend on available pretrained models and on the required number of labels per image. Transitioning to such a dataset might already pose some issues for the langauge model due to the nature of the labels which might suffer from the human reporting bias \cite{misra2016seeing}, but this depends on the nature of the chosen dataset, as well as the objective to generate rather human-like discriminative captions (and therefore, possibly even benefitting from such a bias).
+
+Since this goal of natural image captioning has been approached with different methods like vision-language models (e.g., \cite{kim2021vilt}), the \textit{modus operandi} of the thesis could be to compare three different methods of generating pragmatic image captions.\footnote{``pragmatic'' in the sense of \cite{andreas2016reasoning}}
+
+The three methods might include: 
+\begin{enumerate}
+	\item  training a speaker model with a pragmatic caption generation objective in a multi-agent communication setting akin to the set-up by \cite{lazaridou2020multi}. While one could just replicate one of their architectures with other training data (e.g., the multi-task learning architecture), one might also try to use a different loss function actually conditioning on both images, e.g., as proposed by \cite{vedantam2017context} (the so-called introspective speaker), as differences in loss functions might result in relatively large impact on performance. However, specifics of choosing a loss / policy function are definitely subject to further investigation. Other architectures proposed by \cite{lazaridou2020multi} could also be replicated, but this one seemed to be well-motivated to me in the sense that the model is supposed to simultaneously learn to extract important discriminative features from images and to refer to them using language, as opposed to learning the two skills separately.
+	\item replicating the set-up proposed by \cite{andreas2016reasoning} on the new training dataset. Their architecture seems to be transferable to a different dataset without any major adjustments, but follow-up related work like \cite{nie2020pragmatic} could also be considered. 
+	\item using a vision-language-pretraining based model like the ViLT \cite{kim2021vilt} which combines visual and linguistic feature representations early on in the training process and can be fine-tuned to produce image captions or perform caption-based image retrieval. While several such vision-language model variants exit, the ViLT seems to be the most computationally lightweight one.  
+\end{enumerate}
+
+This comparison would allow to access whether (1) fine-tuning the language model on a listener's downstream task feedback, (2) performing pragmatic reasoning, or (3) early text-vision attention-based feature integration for multimodal datasets produces best pragmatic image captions, e.g., for a referential game. Ideally, this assessment could involve a small human study where participants could rate sample captions with respect to their fluency, as well as play the reference game. Alternatively, a listener agent could be used for evaluation as suggested by \cite{lazaridou2020multi}.
+
+Furthermore, such a comparison would allow to compare different state-of-the-art pragmatic caption generation methods with respect to scalability to realistic visual input data, training and inference time / resources, and susceptibility to language drift. Especially the latter aspect has been addressed separately for different model architecures, but no clear comparison between different ways to integrate visual and textual modules with respect to their impact on language drift has been conducted \cite{lu2020countering, lazaridou2020multi, lee2019countering}. Choosing appropriate evaluation criteria for the latter point would be a critical part of finalizing the thesis planning.
+
+\textbf{(2) Structure:} The thesis would consist of roughly the following chapters, assuming the rough topic suggested above:
+\begin{enumerate}
+	\item Introduction and motivation: outline of the gap in prior research and motivation for the thesis, framing the topic within the research field
+	\item Previous work and theoretical background: review of previous work addressing related questions and using related methods, discussed in subchapters per model type. Possibly review of theoretical background for cognitive plausibility aspects and model comparison metrics
+	\item Experiments: a dataset subchapter, a subchapter for each experiment (split into architecture, training, results)
+	\item Model comparisons: a subchapter per comparison aspect, discussing methods of evaluation and results
+	\item Discussion and conclusion of the results
+\end{enumerate} 
+ 
+ \textbf{(3) Different ideas:} While reference games have been an influential training paradigm for multi-agent communication, intuitively, such a situation contrasting entirely different scenes against each other might seem rather unrealistic. A more realistic set-up might be considering gradual changes within the same scene and detecting meaningful contrasts within a scene. Some work exists in this direction (e.g., \cite{jhamtani2018learning}). Maybe this task might be interesting for multi-agent communication.
+ 
+ A different more realistic task might be visual question answering, which has also been addressed within vision-language-pretraining models (e.g., \cite{lu2019vilbert, nie2020pragmatic}).
+ 
+ Finally, another different idea would be to build a system producing live grammatical natural language captions for live image input (e.g., via webcam) which is segmented, e.g., via an object detection model. The latter part exists, e.g., based on the YOLOv4 object detector \cite{bochkovskiy2020yolov4}, but I don't know whether the former part has been addressed.
+ 
+\bibliographystyle{apalike}
+\bibliography{tsvilodub_msc_thesis_proposal.bib}
+\end{document}
