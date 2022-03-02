@@ -1,6 +1,6 @@
 import tensorflow as tf
-from preprocess_images import load_image
-from load_records import load_captions_data
+from . import preprocess_images 
+from . import load_records 
 
 # def process_input(img_path, captions):
 #     return decode_and_resize(img_path), vectorization(captions)
@@ -13,8 +13,8 @@ def make_dataset(images, captions):
 
     # load the records
     _, filenames, captions = load_captions_data(
-            download_dir=,
-            filename=,
+            download_dir="data/", # TODO
+            filename="data/", # TODO
         )
     # load images   
     # not sure if this works   

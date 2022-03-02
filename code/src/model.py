@@ -1,3 +1,10 @@
+import tensorflow as tf
+from utils.build_dataset import make_dataset
+from utils.download import maybe_download_and_extract
+from utils.encode_captions import TokenizerWrap
+from utils.load_records import load_captions_data
+from utils.preprocess_images import load_image
+
 # Path to the images
 IMAGES_PATH = "Flicker8k_Dataset"
 
@@ -20,3 +27,4 @@ FF_DIM = 512
 BATCH_SIZE = 64
 EPOCHS = 30
 AUTOTUNE = tf.data.AUTOTUNE
+print("success")

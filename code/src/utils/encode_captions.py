@@ -1,5 +1,6 @@
 from tensorflow.keras.layers import TextVectorization
 import re
+from tensorflow.keras.preprocessing.text import Tokenizer
 
 def custom_standardization(input_string):
     lowercase = tf.strings.lower(input_string)
@@ -94,5 +95,5 @@ class TokenizerWrap(Tokenizer):
         
         return tokens
 
-tokenizer = TokenizerWrap(texts=captions_train_flat,
-                          num_words=num_words)
+# tokenizer = TokenizerWrap(texts=captions_train_flat,
+#                           num_words=num_words)
