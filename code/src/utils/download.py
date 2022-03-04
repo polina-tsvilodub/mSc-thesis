@@ -44,21 +44,27 @@ def maybe_download_and_extract(
         download_dir: str
             Target download and extraction directory
     """
-
+    # strip the filename suffix to create subdirectory first
+    file_name_strip = filename.split("/")[0]
     # Filepath for saving the file downloaded from the internet.
-    file_path = os.path.join(download_dir, filename)
-
+    file_path = os.path.join(download_dir, file_name_strip)
+    # full filepath for checking if the zip file already exists
+    file_path_full = os.path.join(download_dir, filename)
+    
     # Check if the file already exists.
     # If it exists then we assume it has also been extracted,
     # otherwise we need to download and extract it now.
-    if not os.path.exists(file_path):
+    if not os.path.exists(file_path_full):
         # Check if the download directory exists, otherwise create it.
         if not os.path.exists(download_dir):
             os.makedirs(download_dir)
+        if not os.path.exists(file_path):
+            os.makedirs(file_path)    
 
         # Download the file from the internet.
+        url = base_url + filename
         file_path, _ = urllib.request.urlretrieve(url=url,
-                                                  filename=file_path,
+                                                  filename=str(file_path_full),
                                                   reporthook=_print_download_progress)
 
         print("Download of ", filename, " finished. Extracting files.")
