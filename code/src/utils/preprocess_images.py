@@ -1,4 +1,5 @@
 import tensorflow as tf 
+import os 
 
 def load_image(
         path: str,
@@ -21,7 +22,8 @@ def load_image(
             Single preprocessed image with tf.float32 encoding           
     """
     # Load image from given location
-    img = tf.io.read_file(path)
+    path_image = os.path.join("../../../data/val/zips/val2014.zip/", path)
+    img = tf.io.read_file(path_image)
     img = tf.image.decode_jpeg(img, channels=3)
     # Resize image if desired
     if not size is None:

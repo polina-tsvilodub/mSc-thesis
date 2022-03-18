@@ -1,6 +1,10 @@
+import os 
+import json
+
 def load_captions_data(
         download_dir: str, 
         filename: str,
+        is_train=False,
     ) -> tuple:
     """
     Loads captions (text) data from json files and maps them to corresponding images.
@@ -22,12 +26,16 @@ def load_captions_data(
             Lists of captions for each image
     """
 
-      # Full path for the data-file.
-    path = os.path.join(download_dir, "annotations", filename)
+    # Full path for the data-file.
+    if is_train:
+        path = os.path.join(download_dir, "annotations", "".join([filename, "_train2014.json"]))
+    else: 
+        path = os.path.join(download_dir, "annotations", "".join([filename, "_val2014.json"])) 
 
     # Load the json file.
     with open(path, "r", encoding="utf-8") as file:
         data_raw = json.load(file)
+        print("Building records for ", path)
 
     # Convenience variables.
     images = data_raw['images']
@@ -79,6 +87,7 @@ def load_captions_data(
     # Convert the records-dict to a list of tuples.
     records_list = [(key, record['filename'], record['captions'])
                     for key, record in sorted(records.items())]
+    print("Records example: ", records_list[0:2])                
 
     # Convert the list of tuples to separate tuples with the data.
     ids, filenames, captions = zip(*records_list)
