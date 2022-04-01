@@ -1,0 +1,18 @@
+Literature review notes go here.
+
+Karpathy and Fei-Fei, 2015:
+\begin{itemize}
+	\item CNN extracting regions: A Region CNN, pretrained on ImageNet and finetuned on 200 classes from ImageNet Detection Challenge, top 19 detected regions + whole image are kept and embedded intp 4096 dimensional space
+	\item BRNN over captions, to address isue of dependencies etc when embedding words into visual space, using 300-dimensional word2vec embeddings. 
+	\item compute alignment between them, predict captions based on inferred alignment through new Multimodal RNN architecture
+	\item basic assumption: sentences are weak labels, which corespond to some unknown location in the image
+	\item mention previous work where sentence templates are filled based on image content -- important for 3Dshapes experiment
+	\item bidirectional recurrent net used to compute word representations, novel objective when learning alignment
+	\item new objective: image-sentence score: dot product as single best alignment of a word to one image region, with margin maximization between align image-sentence pairs vs non-aligned ones
+	\item goal: align text snippets, not only single words, to bounding boxes. This is achieved by treating the true alignment as a Markov Random Field, such that interactions between neighbouring words encourage alignment to the sam region.
+	\item Multimpdal RNN: takes image pixels and a sequence of input vectors as input, where the image embedding is input as an additional bias at timestep 1. Hidden layer size is 512. The hidden layers are initialized with 0. They provide other important optimization details.
+	\item They preprocess the sentences to lower-case, discarding non-alphanumeric characters. Importantly, they only keep words with frequency at least 5, resulting in 8791 words for 123000 MS COCO images. 
+	\item the critical novelty is in the max margin loss which integrates the alignment score, which is used to train the BRNN
+	\item ranking comparison on MS COCO reported -- check if I'll be able to compare to their performance.
+	\item unclear how they train the MultimodelRNN on the alignment input -- they actually take the predicted labels for given bounding boxes from step before. For some reason, the annotators were asked to draw the bounding boxes, as opposed to receiving the ones proposed by the model.
+\end{itemize}

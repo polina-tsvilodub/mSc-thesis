@@ -3,11 +3,15 @@ code/src/notebooks/.ipynb_checkpoints/
 code/src/notebooks/Text2Image-master/
 code/src/notebooks/__pycache__/
 code/src/utils/__pycache__/
+writing/thesis/main.pdf
 *.aux
 *.bbl
+*.bcf
 *.blg
 *.fff
 *.ttt
 *.log
 *.out
 *.synctex.gz
+*.toc
+*.xml
