@@ -15,3 +15,4 @@ writing/thesis/main.pdf
 *.synctex.gz
 *.toc
 *.xml
+*.pkl

@@ -1,136 +1,13 @@
 import json
 import os
-import tensorflow as tf
-from . import preprocess_images
-from . import load_records 
+import torch
+from . import dataset_utils 
 
-# def process_input(img_path, captions):
-#     return decode_and_resize(img_path), vectorization(captions)
 
-def _sort_images_by_category(download_dir, filename, is_train):
-    """
-    Sort image filenames into a dictionary with supercategory IDs as keys.
-
-    Arguments:
-    --------
-        filename: str (instances file)
-            Path to file containing image filenames and category annotations
-    Returns:
-    ------
-        categories: dict
-            Dict of form {category_id : [image file names] }
-    """
-    # check if json file with this info laready exists, otherwise export
-    if os.path.exists("../../data/categories_to_image_paths.json"):
-        print("Category to image IDs json file already exists!")
-        # read existing file
-        with open("../../data/categories_to_image_paths.json", "r", encoding="utf-8") as fp:
-            categories = json.load(fp)
-        return categories
-    else:    
-        # load instances file
-        if is_train:
-            path = os.path.join(download_dir, "annotations", "".join([filename, "_train2014.json"]))
-        else: 
-            path = os.path.join(download_dir, "annotations", "".join([filename, "_val2014.json"]))  
-
-        # Load the json file.
-        with open(path, "r", encoding="utf-8") as file:
-            categories_raw = json.load(file)
-            print("Loading categories for ", path)
-    
-        # load annotations section
-        # TODO check how to map IDs to names elsewhere
-        # category_names_ids = [(cat["id"], cat["name"]) for cat in categories_raw["categories"]]
-        category_ids = [cat["id"] for cat in categories_raw["categories"]]
-        print("List of category IDs: ", category_ids)
-        # create empty dict for records
-        categories = dict()
-        # create dictinary with all the keys
-        for i in category_ids:
-            categories[i] = list()
-        # build helper image dictionary with image IDs as keys
-        images_raw = categories_raw["images"]
-        image_dict = dict()
-        for image in images_raw:
-            image_dict[image["id"]] = image 
-
-        # assign image filenames to the category keys
-        # get image IDs from annotation entries
-        annotation_ids = categories_raw["annotations"] 
-        print("Number of records: ", len(annotation_ids))  
-        for ann in annotation_ids:
-            # get the image id of the entry
-            image = ann["image_id"]
-            # get the category id of the entry
-            category = ann["category_id"]
-            image_path = image_dict[image]["file_name"]
-            # append imagepath to respective category
-            categories[category].append(image_path)
-            
-        print("Dumping json ...")
-
-        with open("../../data/categories_to_image_paths.json", "w") as fp:
-            json.dump(categories, fp)
-
-        return categories    
-
-def _get_image_categories(download_dir, is_train):
-    """
-    Function mapping each image ID to all category annotations.
-    """
-    # check is file already exists
-    if os.path.exists("../../data/imageIDs_to_categories.json"):
-        print("Image IDs to category IDs json file already exists!")
-        # read existing file
-        with open("../../data/imageIDs_to_categories.json", "r", encoding="utf-8") as fp:
-            images = json.load(fp)
-        return images
-    else:  
-        if is_train: 
-            file_path = os.path.join(download_dir, "annotations", "instances_train2014.json")
-        else:
-            file_path = os.path.join(download_dir, "annotations", "instances_val2014.json")    
-        # load annotations file
-        with open(file_path) as f:
-            categories = json.load(f)
-        # load categories to supercategories mapping file
-        with open("../../data/categories_to_supercategories.json", "r") as cats:
-            supercats = json.load(cats)    
-        # create dictionary with image ids as keys
-        images = dict()
-        images_raw = categories["images"]
-        for image in images_raw:
-            images[image["id"]] = dict()
-            images[image["id"]]["categories"] = list()
-            images[image["id"]]["supercategories"] = list()
-            
-        for ann in categories["annotations"]:
-            # check if category already included
-            if ann["category_id"] in images[ann["image_id"]]["categories"]:
-                pass
-            else:
-                images[ann["image_id"]]["categories"].append(ann["category_id"])
-            # add supercategories
-            supercat = supercats[str(ann["category_id"])]
-            if supercat in images[ann["image_id"]]["supercategories"]:
-                pass
-            else:
-                images[ann["image_id"]]["supercategories"].append(supercat)
-            # check if the image is too crowded to be used in the within-category training
-            if len(images[ann["image_id"]]["categories"]) > 6:
-                images[ann["image_id"]]["has_many_categories"] = True 
-            else:
-                images[ann["image_id"]]["has_many_categories"] = False 
-
-        # write out json
-        with open("../../data/imageIDs_to_categories.json", "w") as fp:
-            json.dump(images, fp)
-        return images
 
 def make_dataset(download_dir, filename, is_train):
     """
-    Build tensorflow dataset with images and captions.
+    Build torch dataset with images and captions.
     Images are first sorted into categories, images from 40 categories are chosen,
     then these are shuffled. 
 
@@ -149,22 +26,26 @@ def make_dataset(download_dir, filename, is_train):
     """
 
     print("Sorting images...")
-    _sort_images_by_category(
-        download_dir=download_dir,
-        filename="instances",
-        is_train=is_train,
-    )
+    # _sort_images_by_category(
+    #     download_dir=download_dir,
+    #     filename="instances",
+    #     is_train=is_train,
+    # )
     print("Assign categories to images...")
-    _get_image_categories(
-        download_dir=download_dir,
-        is_train=is_train,
-    )
+    # _get_image_categories(
+    #     download_dir=download_dir,
+    #     is_train=is_train,
+    # )
     # load the records
-    _, filenames, captions = load_records.load_captions_data(
-            download_dir=download_dir, 
-            filename=filename, # annotations filename
-            is_train=is_train,
-        )
+    # instantiate dataset here now 
+
+    # instantiate get_loader 
+
+    # _, filenames, captions = load_records.load_captions_data(
+    #         download_dir=download_dir, 
+    #         filename=filename, # annotations filename
+    #         is_train=is_train,
+        # )
     # load images   
     # not sure if this works  
     # print("Building image tfds") 
@@ -184,3 +65,96 @@ def make_dataset(download_dir, filename, is_train):
 
 # Pass the list of images and the list of corresponding captions
 # train_dataset = make_dataset(list(train_data.keys()), list(train_data.values()))
+
+def get_loader(transform,
+               mode='val',
+               batch_size=1,
+               vocab_threshold=None,
+               vocab_file='../../data/vocab.pkl',
+               start_word="START",
+               end_word="END",
+               unk_word="UNK",
+               vocab_from_file=True,
+               num_workers=0,
+               download_dir="../../../data/val/",
+               vocab_from_pretrained=False,
+               categorize_imgs=False,
+              ):
+    """Returns the data loader.
+    Args:
+      transform: Image transform.
+      mode: One of 'train' or 'test'.
+      batch_size: Batch size (if in testing mode, must have batch_size=1).
+      vocab_threshold: Minimum word count threshold.
+      vocab_file: File containing the vocabulary. 
+      start_word: Special word denoting sentence start.
+      end_word: Special word denoting sentence end.
+      unk_word: Special word denoting unknown words.
+      vocab_from_file: If False, create vocab from scratch & override any existing vocab_file.
+                       If True, load vocab from from existing vocab_file, if it exists.
+      num_workers: Number of subprocesses to use for data loading 
+      cocoapi_loc: The location of the folder containing the COCO API: https://github.com/cocodataset/cocoapi
+    """
+    
+    assert mode in ['train', 'test', 'val'], "mode must be one of 'train' or 'test'."
+    
+    if vocab_from_file==False: assert mode=='train' or mode=='val', "To generate vocab from captions file, must be in training mode (mode='train')."
+
+    # Based on mode (train, val, test), obtain img_folder and annotations_file.
+    if mode == 'val':
+        if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
+        img_folder = os.path.join(download_dir, "val2014/") 
+        annotations_file = os.path.join(download_dir, 'annotations/captions_val2014.json')
+    if mode == 'train':
+        if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
+        img_folder = os.path.join(download_dir, "train2014/") 
+        annotations_file = os.path.join(download_dir, 'annotations/captions_train2014.json')
+    if mode == 'test':
+        assert batch_size==1, "Please change batch_size to 1 if testing your model."
+        assert os.path.exists(vocab_file), "Must first generate vocab.pkl from training data."
+        assert vocab_from_file==True, "Change vocab_from_file to True."
+        img_folder = os.path.join(download_dir, "val2014/") #'test2014/'
+        annotations_file = os.path.join(download_dir, 'annotations/captions_val2014.json') #image_info_test2014
+
+    # TODO: alternatively, modify / sort the image IDS on the instantiated dataset.ids object 
+    # COCO caption dataset.
+    dataset = dataset_utils.COCOCaptionsDataset(
+        file=annotations_file,
+        download_dir = download_dir, 
+        img_transform=transform,
+        text_transform=None,
+        batch_size=batch_size,
+        mode=mode,
+        vocab_threshold=vocab_threshold,
+        vocab_file=vocab_file,
+        start_token=start_word,
+        end_token=end_word,
+        unk_token=unk_word,
+        vocab_from_file=vocab_from_file,
+        vocab_from_pretrained=vocab_from_pretrained,
+        max_sequence_length=25,
+        categorize_imgs=categorize_imgs,
+    )
+    
+
+    if mode == 'train':
+        # Randomly sample a caption length, and sample indices with that length.
+        indices = dataset.get_train_indices()
+        # Create and assign a batch sampler to retrieve a batch with the sampled indices.
+        initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
+        # data loader for COCO dataset.
+        data_loader = torch.utils.data.DataLoader(
+            dataset=dataset, 
+            num_workers=num_workers,
+            batch_sampler=torch.utils.data.sampler.BatchSampler(sampler=initial_sampler,
+                                                                batch_size=dataset.batch_size,
+                                                                drop_last=False))
+    else:
+        data_loader = torch.utils.data.DataLoader(
+            dataset=dataset,               
+            batch_size=dataset.batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+        )
+
+    return data_loader
