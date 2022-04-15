@@ -2,50 +2,64 @@
 import os
 from utils.build_dataset import make_dataset, get_loader
 from utils.download import maybe_download_and_extract
+from utils.train import pretrain_speaker
 import torch
 from torchvision import transforms
 import torch.nn as nn
 from agents.speaker import SpeakerEncoderCNN, DecoderRNN
 import math
-# from utils.encode_captions import TokenizerWrap
-# from utils.load_records import load_captions_data
-# from utils.preprocess_images import load_image
 
+
+# set random seed
+torch.manual_seed(42)
+
+#######
+# HYPERPARAMS 
+########
 
 # Desired image dimensions
-IMAGE_SIZE = (299, 299)
+IMAGE_SIZE = 256
 
-# Vocabulary size
+# Vocabulary parameters
 VOCAB_SIZE = 10000
-
+VOCAB_THRESHOLD = 1 # minimum word count threshold
+VOCAB_FROM_FILE = True # if True, load existing vocab file
+VOACAB_FROM_PRETRAINED = False
 # Fixed length allowed for any sequence
-# SEQ_LENGTH = 25
+MAX_SEQUENCE_LENGTH = 25
+# path / name of vocab file
+VOCAB_FILE = "../../data/vocab.pkl"
 
-# Dimension for the image embeddings and token embeddings
-EMBED_SIZE = 512
-
-# Per-layer units in the feed-forward network
-FF_DIM = 512
+# Model Dimensions
+EMBED_SIZE = 512 # dimensionality of image and word embeddings, needs to match because they are concatenated
+HIDDEN_SIZE = 512 # number of features in hidden state of the LSTM decoder
 
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 30
-# AUTOTUNE = tf.data.AUTOTUNE
-print("beginning main script")
+EPOCHS = 30 # number of training epochs
+PRINT_EVERY = 500 # window for printing average loss (steps)
+SAVE_EVERY = 1 # frequency of saving model weights (epochs)
+LOG_FILE = '../../data/speaker_pretraining_log.txt' # name of file with saved training loss and perplexity
+MODE= 'train' # network mode
+WEIGHTS_PATH='../../data/models'
 
-# download data
-# think about caching as in example 
+# data download params
 DOWNLOAD_DIR_TRAIN = "../../data/train"
 DOWNLOAD_DIR_VAL = "../../data/val"
 
 BASE_URL = "http://images.cocodataset.org/"
-domains_list = [
-    # "zips/val2014.zip", 
-    "annotations/annotations_trainval2014.zip",
-    "zips/train2014.zip", 
-]
+domains_list = {
+    DOWNLOAD_DIR_VAL: "zips/val2014.zip", 
+    DOWNLOAD_DIR_TRAIN: ["annotations/annotations_trainval2014.zip",
+    "zips/train2014.zip"], 
+}
+
+#########
+
+print("Beginning speaker pretraining script...")
+
 # download data 
-for filename in domains_list:
+for filename in domains_list[DOWNLOAD_DIR_TRAIN]:
     url = BASE_URL + filename
     print("Downloading ", filename)
     maybe_download_and_extract(
@@ -53,36 +67,30 @@ for filename in domains_list:
         filename = filename,
         download_dir = DOWNLOAD_DIR_TRAIN,
     )
-# TODO tab in for iterating over files or make domain a cmd arg
-# build records from annotations file
-# TODO this is actually unnecessary here
+      
 
-vocab_threshold = 1        # minimum word count threshold
-vocab_from_file = True    # if True, load existing vocab file
-# embed_size = 512           # dimensionality of image and word embeddings
-hidden_size = 512          # number of features in hidden state of the RNN decoder
-num_epochs = 1             # number of training epochs (1 for testing)
-save_every = 1             # determines frequency of saving model weights
-print_every = 200          # determines window for printing average loss
-log_file = 'training_log.txt'       # name of file with saved training loss and perplexity
-
-# (Optional) TODO #2: Amend the image transform below.
+# image preprocessing
+# no cropping because relevant objects might get cropped and the grounding wouldn't be sensible anymore
 transform_train = transforms.Compose([ 
-    transforms.Resize(256),                          # smaller edge of image resized to 256
-    transforms.RandomCrop(224),                      # get 224x224 crop from random location
+    transforms.Resize(IMAGE_SIZE),                   # resize image resolution to 256 (along smaller edge, the other proportionally)
+    transforms.Pad(32),
+    transforms.RandomCrop(IMAGE_SIZE),
     transforms.RandomHorizontalFlip(),               # horizontally flip image with probability=0.5
     transforms.ToTensor(),                           # convert the PIL Image to a tensor
-    transforms.Normalize((0.485, 0.456, 0.406),      # normalize image for pre-trained model
+    # TODO check params
+    transforms.Normalize((0.485, 0.456, 0.406),      # normalize image for pre-trained model, tuples for means and std for the three img channels
                          (0.229, 0.224, 0.225))])
 
-# Build data loader.
+# TODO renormalize image again for output if necessary, and think if these transforms need to be the same for speaker and listener functional training
+
+# Build data loader, allowing to iterate over records from annotations file
 data_loader = get_loader(
     transform=transform_train,
-    mode='train',
+    mode=MODE,
     batch_size=BATCH_SIZE,
-    vocab_threshold=vocab_threshold,
-    vocab_file="../../data/vocab.pkl",
-    vocab_from_file=vocab_from_file,
+    vocab_threshold=VOCAB_THRESHOLD,
+    vocab_file=VOCAB_FILE,
+    vocab_from_file=VOCAB_FROM_FILE,
     download_dir=DOWNLOAD_DIR_TRAIN,
 )
 
@@ -92,7 +100,7 @@ vocab_size = len(data_loader.dataset.vocab)
 
 # Initialize the encoder and decoder. 
 encoder = SpeakerEncoderCNN(EMBED_SIZE)
-decoder = DecoderRNN(EMBED_SIZE, hidden_size, vocab_size)
+decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size)
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -102,38 +110,32 @@ decoder.to(device)
 # Define the loss function. 
 criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
-# TODO #3: Specify the learnable parameters of the model.
+# Specify the learnable parameters of the model.
 params = list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(encoder.embed.parameters()) + list(encoder.batch.parameters())
 
-# TODO #4: Define the optimizer.
+# Define the optimizer.
 optimizer = torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
-# optimizer = torch.optim.Adam(params, lr=0.01, betas=(0.9, 0.999), eps=1e-08)
-# optimizer = torch.optim.RMSprop(params, lr=0.01, alpha=0.99, eps=1e-08)
 
 # Set the total number of training steps per epoch.
-total_step = math.ceil(len(data_loader.dataset.caption_lengths) / data_loader.batch_sampler.batch_size)
-print("TORAL STEPS:", total_step)
+total_steps = math.ceil(len(data_loader.dataset.caption_lengths) / data_loader.batch_sampler.batch_size)
+print("TORAL STEPS:", total_steps)
 
 # training loop
-
+pretrain_speaker(
+    log_file=LOG_FILE,
+    num_epochs=EPOCHS,
+    total_steps=total_steps,
+    data_loader=data_loader, 
+    encoder=encoder,
+    decoder=decoder,
+    params=params,
+    criterion=criterion,
+    optimizer=optimizer,
+    weights_path=WEIGHTS_PATH,
+    print_every=PRINT_EVERY,
+    save_every=SAVE_EVERY,
+)
 # dump training stats and model 
-
-# _, filenames, captions = load_captions_data(
-#     download_dir=DOWNLOAD_DIR_VAL, # TODO change to zips or annotations directory?
-#     filename="captions_val2014.json",
-# )
-# print("TYPES: ", type(filenames), " ", type(captions))
-# print("executing make daatset")
-
-# build dataset from records, while preprocessing images and text
-# ds = make_dataset(
-#     download_dir=DOWNLOAD_DIR_TRAIN,
-#     filename="captions", # TODO needs to be filenames of single images 
-#     is_train=False, 
-# )
-# encode text
-
-# preprocess images
 
 # check if I need a main function
 # check if I need to parse cmd args
