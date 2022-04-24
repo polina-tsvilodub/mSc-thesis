@@ -30,7 +30,8 @@ class COCOCaptionsDataset(Dataset):
             vocab_file, 
             start_token, 
             end_token,
-            unk_token, 
+            unk_token,
+            pad_token, 
             vocab_from_file, 
             vocab_from_pretrained=False,
             max_sequence_length=0,
@@ -41,9 +42,9 @@ class COCOCaptionsDataset(Dataset):
         self.batch_size = batch_size
         self.vocab = vocabulary.Vocabulary(vocab_threshold, vocab_file, 
                                 start_token, end_token, unk_token, 
-                                file, vocab_from_file, vocab_from_pretrained) 
+                                file, pad_token, vocab_from_file, vocab_from_pretrained) 
         self.max_sequence_length = max_sequence_length
-        
+        self.pad_token=pad_token
         # some distinctions below for Train and test mode
         if mode == "train":
             self.image_dir = os.path.join(download_dir, "train2014") # download_dir needs to be data/train/ then 
@@ -58,9 +59,9 @@ class COCOCaptionsDataset(Dataset):
             self.caption_lengths = [len(token) for token in all_tokens]
             
             # print pretraining IDs for later separation from functional training
-            with open("pretrain_img_IDs.txt", 'w') as f:
-                f.write(",".join([str(i) for i in self.ids]))
-                
+            # save used indices to torch file
+            torch.save(torch.tensor(self.ids), "pretrain_img_IDs.pt")
+
         elif mode == "val":
             self.image_dir = os.path.join(download_dir, "val2014")
             self.coco = COCO(file) # os.path.join(download_dir, file)
@@ -118,6 +119,10 @@ class COCOCaptionsDataset(Dataset):
             caption.append(self.vocab(self.vocab.start_word))
             
             # check if the sequence needs to be truncated
+            if self.max_sequence_length != 0:
+                tokens = tokens[:self.max_sequence_length]
+            
+            # check if the sequence needs to be truncated
             if self.max_sequence_length > 0:
                 tokens = tokens[:self.max_sequence_length]
                 
@@ -156,6 +161,27 @@ class COCOCaptionsDataset(Dataset):
         
         return indices
 
+    def get_func_train_indices(self):
+        """
+        Simple POC function returning two lists on indices for the functional training. 
+        Returns a list of inidces for targets and a list f indices for distractors. 
+        Captions are of same lengths for targets and distractors (will be optimized).
+        
+        Returns:
+        -------
+            list: (int, int)
+                List of tuples of target and distractor indices, each for a single reference game iteration.
+        """
+        
+        sel_length_t = np.random.choice(self.caption_lengths)
+
+        all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
+
+        indices = list(np.random.choice(all_indices_t, size=(self.batch_size)*2))
+        indices_t = indices[:self.batch_size]
+        indices_d = indices[self.batch_size:]
+        
+        return list(zip(indices_t, indices_d))
 
 def _sort_images_by_category(download_dir, filename, is_train):
     """

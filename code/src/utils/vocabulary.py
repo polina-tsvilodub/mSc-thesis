@@ -6,15 +6,6 @@ from torchtext.data import get_tokenizer
 from pycocotools.coco import COCO
 import gensim
 
-# TODO look into this
-# def custom_standardization(input_string):
-    # lowercase = tf.strings.lower(input_string)
-    # return tf.strings.regex_replace(lowercase, "[%s]" % re.escape(strip_chars), "")
-
-
-strip_chars = "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"
-strip_chars = strip_chars.replace("<", "")
-strip_chars = strip_chars.replace(">", "")
 
 class Vocabulary(object):
 
@@ -25,6 +16,7 @@ class Vocabulary(object):
         end_word="END",
         unk_word="UNK",         
         annotations_file="../../data/val/annotation/captions_val2014.json",
+        pad_word="PAD",
         vocab_from_file=False,
         from_pretrained=False,
         ):
@@ -48,6 +40,7 @@ class Vocabulary(object):
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
+        self.pad_word = pad_word
         self.annotations_file = annotations_file
         self.vocab_from_file = vocab_from_file
         self.from_pretrained = from_pretrained
@@ -86,6 +79,7 @@ class Vocabulary(object):
             self.add_word(self.start_word)
             self.add_word(self.end_word)
             self.add_word(self.unk_word)
+            self.add_word(self.pad_word)
             self.add_captions()
 
     def init_vocab(self):
@@ -123,10 +117,12 @@ class Vocabulary(object):
         coco = COCO(self.annotations_file)
         counter = Counter()
         ids = coco.anns.keys()
+        tokenizer = get_tokenizer("basic_english")
         for i, id in enumerate(ids):
             caption = str(coco.anns[id]['caption'])
-            tokenizer = get_tokenizer("basic_english")
-            tokens = tokenizer(caption.lower()) 
+            caption = caption.lower().strip()
+            caption = re.sub(r"[^a-zA-Z.,!?]+", r" ", caption)
+            tokens = tokenizer(caption) 
             counter.update(tokens)
 
             if i % 100000 == 0:

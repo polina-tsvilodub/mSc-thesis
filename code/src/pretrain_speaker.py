@@ -3,15 +3,19 @@ import os
 from utils.build_dataset import make_dataset, get_loader
 from utils.download import maybe_download_and_extract
 from utils.train import pretrain_speaker
+from utils.early_stopping import EarlyStopping
 import torch
 from torchvision import transforms
 import torch.nn as nn
-from agents.speaker import SpeakerEncoderCNN, DecoderRNN
+from agents.speaker import DecoderRNN
+from agents.resnet_encoder import EncoderCNN
 import math
+import random
 
 
 # set random seed
 torch.manual_seed(42)
+random.seed(42)
 
 #######
 # HYPERPARAMS 
@@ -21,27 +25,27 @@ torch.manual_seed(42)
 IMAGE_SIZE = 256
 
 # Vocabulary parameters
-VOCAB_SIZE = 10000
-VOCAB_THRESHOLD = 1 # minimum word count threshold
+VOCAB_THRESHOLD = 11 # minimum word count threshold
 VOCAB_FROM_FILE = True # if True, load existing vocab file
 VOACAB_FROM_PRETRAINED = False
 # Fixed length allowed for any sequence
-MAX_SEQUENCE_LENGTH = 25
+MAX_SEQUENCE_LENGTH = 15
 # path / name of vocab file
 VOCAB_FILE = "../../data/vocab.pkl"
 
 # Model Dimensions
-EMBED_SIZE = 512 # dimensionality of image and word embeddings, needs to match because they are concatenated
+EMBED_SIZE = 1024 # dimensionality of image and word embeddings, needs to match because they are concatenated
 HIDDEN_SIZE = 512 # number of features in hidden state of the LSTM decoder
 
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 30 # number of training epochs
-PRINT_EVERY = 500 # window for printing average loss (steps)
+EPOCHS = 20 # number of training epochs
+PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
 LOG_FILE = '../../data/speaker_pretraining_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
+NUM_VAL_IMGS=1000
 
 # data download params
 DOWNLOAD_DIR_TRAIN = "../../data/train"
@@ -73,11 +77,9 @@ for filename in domains_list[DOWNLOAD_DIR_TRAIN]:
 # no cropping because relevant objects might get cropped and the grounding wouldn't be sensible anymore
 transform_train = transforms.Compose([ 
     transforms.Resize(IMAGE_SIZE),                   # resize image resolution to 256 (along smaller edge, the other proportionally)
-    transforms.Pad(32),
-    transforms.RandomCrop(IMAGE_SIZE),
+    transforms.RandomCrop(224),
     transforms.RandomHorizontalFlip(),               # horizontally flip image with probability=0.5
     transforms.ToTensor(),                           # convert the PIL Image to a tensor
-    # TODO check params
     transforms.Normalize((0.485, 0.456, 0.406),      # normalize image for pre-trained model, tuples for means and std for the three img channels
                          (0.229, 0.224, 0.225))])
 
@@ -94,12 +96,28 @@ data_loader = get_loader(
     download_dir=DOWNLOAD_DIR_TRAIN,
 )
 
+data_loader_val = get_loader(
+    transform=transform_train,
+    mode="val",
+    batch_size=BATCH_SIZE,
+    vocab_threshold=VOCAB_THRESHOLD,
+    vocab_file=VOCAB_FILE,
+    vocab_from_file=True,
+    download_dir=DOWNLOAD_DIR_VAL,
+)
+# truncate the val split
+data_loader_val.dataset.ids = data_loader_val.dataset.ids[:NUM_VAL_IMGS]
+data_loader_val.dataset.caption_lengths = data_loader_val.dataset.caption_lengths[:NUM_VAL_IMGS]
+# save
+torch.save(torch.tensor(data_loader_val.dataset.ids), "pretrain_val_img_IDs.pt")
+
 # instantiate encoder, decoder, params
 # The size of the vocabulary.
 vocab_size = len(data_loader.dataset.vocab)
 
+print("VOCAB SIZE: ", vocab_size)
 # Initialize the encoder and decoder. 
-encoder = SpeakerEncoderCNN(EMBED_SIZE)
+encoder = EncoderCNN(EMBED_SIZE)
 decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size)
 
 # Move models to GPU if CUDA is available. 
@@ -111,14 +129,14 @@ decoder.to(device)
 criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
 # Specify the learnable parameters of the model.
-params = list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(encoder.embed.parameters()) + list(encoder.batch.parameters())
+params = list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(encoder.embed.parameters())
 
 # Define the optimizer.
 optimizer = torch.optim.Adam(params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
 
 # Set the total number of training steps per epoch.
 total_steps = math.ceil(len(data_loader.dataset.caption_lengths) / data_loader.batch_sampler.batch_size)
-print("TORAL STEPS:", total_steps)
+print("TOTAL STEPS:", total_steps)
 
 # training loop
 pretrain_speaker(
@@ -126,6 +144,7 @@ pretrain_speaker(
     num_epochs=EPOCHS,
     total_steps=total_steps,
     data_loader=data_loader, 
+    data_loader_val=data_loader_val,
     encoder=encoder,
     decoder=decoder,
     params=params,
