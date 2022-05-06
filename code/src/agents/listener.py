@@ -15,19 +15,11 @@ class ListenerEncoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.embed_size= embed_size
         self.vocabulary_size = vocab_size
-        # not sure if this will be pretrained
-        self.embed = nn.Embedding(self.vocabulary_size, self.embed_size) # .from_pretrained(
-#                             torch.FloatTensor(self.fasttext.vectors)
-#                         )
-
+        self.embed = nn.Embedding(self.vocabulary_size, self.embed_size) 
         self.lstm = nn.LSTM(self.embed_size, self.hidden_size , self.num_layers, batch_first=True)
-        # reshape into a vector of (1, 512), such that similarity with the image can be computed
-        self.linear = nn.Linear(hidden_size, 1)
         self.embed.weight.data.uniform_(-0.1, 0.1)
+        
 
-    # how is the lstm initialized?
-        self.linear.weight.data.uniform_(-0.1, 0.1)
-        self.linear.bias.data.fill_(0)
     def init_hidden(self, batch_size):
         """ At the start of training, we need to initialize a hidden state;
         there will be none because the hidden state is formed based on previously seen data.
@@ -43,9 +35,51 @@ class ListenerEncoderRNN(nn.Module):
 #         self.hidden = self.init_hidden(self.hidden_size)
         
         embeddings = self.embed(captions)
-        print("LSTM encoder embeddings shape: ", embeddings.shape)
-        # where is the previous hidden state coming from?
-        hiddens, self.hidden = self.lstm(embeddings) # , self.hidden
-        outputs = self.linear(hiddens)
-        print("LSTM encoder outputs shape: ", outputs.shape)
-        return outputs
+        hiddens, self.hidden = self.lstm(embeddings)
+
+        return hiddens, self.hidden[0] 
+
+class ListenerEncoderCNN(EncoderCNN):
+       
+    def forward(self, image_pairs, caption): 
+        """
+        Performs forward pass through the listener ResNet 50 CNN.
+        Computes the dot product between two images and the caption provided by the speaker.
+        Outputs the index of the image which has the highest dot product with the caption - it is the predicted target.
+        
+        Args:
+        ----
+        images1: torch.tensor((batch_size, 3, 224, 224))
+            List of images (potentially containing either targets or distractors).
+        images2: torch.tensor((batch_size, 3, 224, 224))
+            List of images (potentially containing either targets or distractors).
+        caption: torch.tensor((batch_size, sentence_length, embed_size))
+            Last hidden state of the RNN.
+        Returns:
+        ----
+            indices: torch.tensor(batch_size)
+                List of predicted target indices. 
+            
+        """
+        # will be improved
+        images1 = torch.stack([im[0] for im in image_pairs])
+        images2 = torch.stack([im[1] for im in image_pairs])
+        features1 = self.resnet(images1) 
+        features2 = self.resnet(images2) 
+        # reshape features to shape (batch_size, -1) - adapt to first dim
+        features1 = features1.view(features1.size(0), -1)
+        features1 = self.embed(features1)
+        features2 = features2.view(features2.size(0), -1)
+        features2 = self.embed(features2)
+        # compute dot product between images and caption
+        # compute mean over words as sentence embedding representation
+        dot_products_1 = torch.bmm(features1.view(images1.size()[0], 1, features1.size()[1]),
+                                   caption.view(images1.size()[0], features1.size()[1], 1))
+        dot_products_2 = torch.bmm(features2.view(images2.size()[0], 1, features2.size()[1]),
+                                   caption.view(images2.size()[0], features2.size()[1], 1))
+        # compose targets and distractors dot products
+        # stack into pairs, assuming dim=0 is the batch dimension
+        pairs = torch.stack((dot_products_1, dot_products_2), dim=1) 
+        pairs_flat = pairs.squeeze(-1).squeeze(-1)
+        
+        return pairs_flat        

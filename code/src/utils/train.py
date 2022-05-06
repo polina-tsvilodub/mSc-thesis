@@ -11,7 +11,6 @@ def validate_model(
     data_loader_val,
     encoder,
     decoder,
-    num_val_imgs,
 ):
     """
     Utility function for computing the validation performance of the speaker model while pre-training.
@@ -20,9 +19,9 @@ def validate_model(
     val_running_loss = 0.0
     counter = 0
     total = 0
-
+    embedded_imgs = torch.load("./notebooks/resnet_pretrain_embedded_val_imgs.pt")
     total_steps = math.ceil(len(data_loader_val.dataset.caption_lengths) / data_loader_val.batch_sampler.batch_size)
-   
+    print("Val total steps: ", total_steps+1)
     criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
     encoder.eval()
@@ -31,32 +30,49 @@ def validate_model(
     # evaluate model on the batch
     with torch.no_grad():
         print("Validating the model...")
-        for i in range(1, total_steps+1):
+        for i in range(1, total_steps+1): 
              # get val indices
-            indices = data_loader_val.dataset.get_train_indices()
+            indices = data_loader_val.dataset.get_func_train_indices()
+            # create separate lists for retrieving the image emebddings
+            target_inds = torch.tensor([x[0] for x in indices]).long()
+            distractor_inds = torch.tensor([x[1] for x in indices]).long()
+
             new_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
             data_loader_val.batch_sampler.sampler = new_sampler
 
             counter += 1
+            # print("Counter: ", counter)
             # Obtain the batch.
-            images, captions = next(iter(data_loader_val))
+            targets, distractors, target_captions = next(iter(data_loader_val))
 
             # Move batch of images and captions to GPU if CUDA is available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            images = images.to(device)
-            captions = captions.to(device)
+            targets = targets.to(device)
+            distractors = distractors.to(device)
+            target_captions = target_captions.to(device)
+
+            # Pass the inputs through the CNN-RNN model.
+            # after retrieving the resnet embeddings
+            target_features = torch.index_select(embedded_imgs, 0, target_inds)
+            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
+            # concat image features
+            both_images = torch.cat((target_features, distractor_features), dim=-1)
 
             # compute val predictions and loss
-            features = encoder(images)
-            outputs = decoder(features, captions)
+            both_images_features = encoder(both_images)
+            # distractor_features = encoder(distractor_features)
+
+            # both_images = torch.cat((target_features, distractor_features), dim=-1)
+            outputs = decoder(both_images_features, target_captions)
             
             # The size of the vocabulary.
             vocab_size = len(data_loader_val.dataset.vocab)
 
             # Calculate the batch loss.
-            loss = criterion(outputs.contiguous().view(-1, vocab_size), captions.reshape(-1))
+            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1))
 
             val_running_loss += loss.item()
+            # print("val running loss: ", val_running_loss)
             
         
         val_loss = val_running_loss / counter
@@ -112,50 +128,67 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretraining_losses_"
-    val_csv_out = "../../data/pretrain_val_losses_"
+    csv_out = "../../data/pretraining_2imgs_token0_1024dim_losses_2000vocab_"
+    val_csv_out = "../../data/pretraining_2imgs_token0_1024dim_val_losses_2000vocab_"
 
     speaker_losses=[]
     perplexities = []
     steps = []
     val_losses, val_steps = [], []
     # init the early stopper
-    early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.05)
+    early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
+
+    embedded_imgs = torch.load("./notebooks/resnet_pretrain_embedded_imgs.pt")
 
     for epoch in range(1, num_epochs+1):
-        
+        encoder.train()
+        decoder.train()
+
+        decoder.init_hidden(batch_size=64)
         for i_step in range(1, total_steps+1):
             # set models into training mode
-            encoder.train()
-            decoder.train()
+            
                     
             # Randomly sample a caption length, and sample indices with that length.
-            indices = data_loader.dataset.get_train_indices()
+            indices = data_loader.dataset.get_func_train_indices()
+            # create separate lists for retrieving the image emebddings
+            target_inds = torch.tensor([x[0] for x in indices]).long()
+            distractor_inds = torch.tensor([x[1] for x in indices]).long()
             # Create and assign a batch sampler to retrieve a batch with the sampled indices.
             new_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
             data_loader.batch_sampler.sampler = new_sampler
             
             # Obtain the batch.
-            images, captions = next(iter(data_loader))
+            targets, distractors, target_captions = next(iter(data_loader))
 
             # Move batch of images and captions to GPU if CUDA is available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            images = images.to(device)
-            captions = captions.to(device)
+            targets = targets.to(device)
+            distractors = distractors.to(device)
+            target_captions = target_captions.to(device)
             
             # Zero the gradients (reset).
             decoder.zero_grad()
             encoder.zero_grad()
             
             # Pass the inputs through the CNN-RNN model.
-            features = encoder(images)
-            outputs = decoder(features, captions)
+            # after retrieving the resnet embeddings
+            target_features = torch.index_select(embedded_imgs, 0, target_inds)
+            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
+
+            # concat image features
+            both_images = torch.cat((target_features, distractor_features), dim=-1)
+
+            both_images_features = encoder(both_images)
+            # distractor_features = encoder(distractor_features)
+
+            outputs = decoder(both_images_features, target_captions)
             
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
 
             # Calculate the batch loss.
-            loss = criterion(outputs.contiguous().view(-1, vocab_size), captions.reshape(-1))
+            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1))
             
             # Backward pass.
             loss.backward()
@@ -182,34 +215,38 @@ def pretrain_speaker(
             if i_step % print_every == 0:
                 print('\r' + stats)
 
-                # compute validation loss
-                with torch.no_grad():
-                    val_loss = validate_model(
-                        data_loader_val,
-                        encoder,
-                        decoder,
-                        num_val_imgs=1000,
-                    )     
-                    val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i_step, total_steps, val_loss)
-                    print(val_stats)
-                    f.write(val_stats + '\n')
-                    f.flush()   
-                    
-                    val_losses.append(val_loss)
-                    val_steps.append(i_step)
-                    # update stooper
-                    early_stopper(val_loss)
-                    # check if we want to break
-                    if early_stopper.early_stop:
-                        # save the models
-                        torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-earlystopping-%d.pkl' % epoch))
-                        torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-earlystoppiing-%d.pkl' % epoch))
-                        print("Early stopping steps loop!")
-                        break
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-%d.pkl' % epoch))
-            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-token0-1024dim-2000vocab-%d.pkl' % epoch))
+            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-token0-1024dim-2000vocab-%d.pkl' % epoch))
+
+            # compute validation loss
+            with torch.no_grad():
+                val_loss = validate_model(
+                    data_loader_val,
+                    encoder,
+                    decoder,
+                )     
+                # torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-earlystopping-%d-step-%d.pkl' % (epoch, i_step)))
+                # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-earlystoppiing-%d-step-%d.pkl' % (epoch, i_step)))
+                
+                val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i_step, total_steps, val_loss)
+                print(val_stats)
+                f.write(val_stats + '\n')
+                f.flush()   
+                
+                val_losses.append(val_loss)
+                val_steps.append(i_step)
+                # update stooper
+                early_stopper(val_loss)
+                # check if we want to break
+                if early_stopper.early_stop:
+                    # save the models
+                    torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-token0-1024dim-earlystopping-2000vocab-%d.pkl' % epoch))
+                    torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-token0-1024dim-earlystoppiing-2000vocab-%d.pkl' % epoch))
+                    print("Early stopping steps loop!")
+                    break
+
         # save the training metrics
         df_out = pd.DataFrame({
             "steps": steps,
