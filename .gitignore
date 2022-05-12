@@ -2,10 +2,16 @@ data/
 code/src/notebooks/.ipynb_checkpoints/
 code/src/notebooks/Text2Image-master/
 code/src/notebooks/__pycache__/
+code/src/reference_game_utils/__pycache__/
 code/src/utils/__pycache__/
 code/src/agents/__pycache__/
+code/src/agents/__pycache__/speaker.cpython-37.pyc
 code/src/models/
+code/src/notebooks/models/
+code/src/notebooks/*.csv
+code/src/notebooks/*.pkl
 writing/thesis/main.pdf
+writing/thesis/main-blx.bib
 *.aux
 *.bbl
 *.bcf
@@ -19,3 +25,4 @@ writing/thesis/main.pdf
 *.xml
 *.pkl
 *.pt
+*.txt
