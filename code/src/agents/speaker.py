@@ -31,7 +31,7 @@ class DecoderRNN(nn.Module):
         self.vocabulary_size = vocab_size
         self.visual_embed_size = visual_embed_size
         self.embed = nn.Embedding(self.vocabulary_size, self.embed_size) 
-        self.lstm = nn.LSTM(self.embed_size+2*self.visual_embed_size, self.hidden_size , self.num_layers, batch_first=True)
+        self.lstm = nn.LSTM(self.embed_size + 2*self.visual_embed_size, self.hidden_size , self.num_layers, batch_first=True) # self.embed_size+
         self.linear = nn.Linear(hidden_size, self.vocabulary_size)
         self.embed.weight.data.uniform_(-0.1, 0.1)
 
@@ -68,7 +68,7 @@ class DecoderRNN(nn.Module):
         features = features.unsqueeze(1)
         features_reps = features.repeat(1, embeddings.shape[1]-1, 1)
         # PREpend the feature embedding as additional context AT EACH TIMESTEP, cut off END token        
-        embeddings = torch.cat((features_reps, embeddings[:, :-1,:]), dim=-1)
+        embeddings = torch.cat((features_reps, embeddings[:, :-1,:]), dim=-1) # features_reps, dim=-1
         hiddens, self.hidden = self.lstm(embeddings)
         
         outputs = self.linear(hiddens)

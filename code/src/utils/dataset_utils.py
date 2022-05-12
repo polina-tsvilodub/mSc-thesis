@@ -52,15 +52,19 @@ class COCOCaptionsDataset(Dataset):
             _ids = list(self.coco.anns.keys())
             shuffle(_ids)
             # retrieve a subset of images for pretraining
-            self.ids = _ids[:70000]
+            self.ids = list(self.coco.anns.keys()) #torch.load("pretrain_img_IDs_2imgs.pt").tolist()#_ids[:70000]
+            # set the image IDs for validation during early stopping to avoid overlapping images
+            self.ids_val = torch.load("pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
             all_tokens = [tokenizer(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))] 
+            all_tokens_val = [tokenizer(str(self.coco.anns[self.ids_val[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids_val)))] 
             self.caption_lengths = [len(token) for token in all_tokens]
-            
+            self.caption_lengths_val = [len(token) for token in all_tokens_val] 
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
-            torch.save(torch.tensor(self.ids), "pretrain_img_IDs.pt")
+            torch.save(torch.tensor(self.ids), "pretrain_img_IDs_2imgs_1024dim.pt")
+            torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
 
         elif mode == "val":
             self.image_dir = os.path.join(download_dir, "val2014")
@@ -84,55 +88,55 @@ class COCOCaptionsDataset(Dataset):
     
     def __getitem__(self, idx):
         """
-        Return an image-caption tuple. The items are indexed as unique caption to image pairs.
+        Return an image-caption tuple. A random caption per images is chosen since the dataset maps captions onto images.
         
-        Args:
+        Arguments:
         -------
         idx: int
             Index of the item to be returned.
-
         Returns:
-        ------
-        image, caption: torch.Tensor, torch.Tensor    
-            Tranformed image and tensor of tokoen indices of the caption.
+        -----
+        image: torch.tensor((3,224,224))
+        caption: torch.tensor((len_caption))
         """
-        # TODO watch out that the same image-caption pair isn't used too often
         
         # obtain image and caption if in training mode
         if self.mode != 'test':
-            ann_id = self.ids[idx]
-            caption = self.coco.anns[ann_id]['caption']
+            # get target and distractor indices
+            target_idx = idx[0]
+            distractor_idx = idx[1]
+            
+            ann_id = self.ids[target_idx]
+            target_caption = self.coco.anns[ann_id]['caption']
             img_id = self.coco.anns[ann_id]['image_id']
-            path = self.coco.loadImgs(img_id)[0]['file_name']
+            target_path = self.coco.loadImgs(img_id)[0]['file_name']
+
+            # get distarctor
+            dist_id = self.ids[distractor_idx]
+            dist_img_id = self.coco.anns[dist_id]['image_id']
+            distractor_path = self.coco.loadImgs(dist_img_id)[0]['file_name']
 
             # Convert image to tensor and pre-process using transform
-            image = Image.open(os.path.join(self.image_dir, path)).convert('RGB')
-            image = self.transform(image)
+            target_image = Image.open(os.path.join(self.image_dir, target_path)).convert('RGB')
+            target_image = self.transform(target_image)
 
-            # TODO check if any other preprocessing of the caption needs to be performed
-            
+            distractor_image = Image.open(os.path.join(self.image_dir, distractor_path)).convert('RGB')
+            distractor_image = self.transform(distractor_image)
+
             tokenizer = get_tokenizer("basic_english")
-            # TODO possibly shorten too long captions
-            tokens = tokenizer(str(caption).lower())
+            tokens = tokenizer(str(target_caption).lower())
             # Convert caption to tensor of word ids, append start and end tokens.
-            caption = []
-            caption.append(self.vocab(self.vocab.start_word))
-            
-            # check if the sequence needs to be truncated
+            target_caption = []
+            target_caption.append(self.vocab(self.vocab.start_word))
+
+            # check if the sequence needs to be padded or truncated
             if self.max_sequence_length != 0:
                 tokens = tokens[:self.max_sequence_length]
-            
-            # check if the sequence needs to be truncated
-            if self.max_sequence_length > 0:
-                tokens = tokens[:self.max_sequence_length]
-                
-            caption.extend([self.vocab(token) for token in tokens])
-            caption.append(self.vocab(self.vocab.end_word))
-           
-            caption = torch.Tensor(caption).long()
 
-            # return pre-processed image and caption tensors
-            return image, caption
+            target_caption.extend([self.vocab(token) for token in tokens])
+            target_caption.append(self.vocab(self.vocab.end_word))
+            target_caption = torch.Tensor(target_caption).long()
+            return target_image, distractor_image, target_caption
 
         # obtain image if in test mode
         else:
@@ -145,21 +149,6 @@ class COCOCaptionsDataset(Dataset):
             # return original image and pre-processed image tensor
             return orig_image, image
         
-    def get_train_indices(self):
-        """
-        Return a list of indices at which the captions have the same length which was sampled at random 
-        for the given batch.
-
-        Returns:
-        ------
-        indices: list
-            List of indices for a batch. 
-        """
-        sel_length = np.random.choice(self.caption_lengths)
-        all_indices = np.where([self.caption_lengths[i] == sel_length for i in np.arange(len(self.caption_lengths))])[0]
-        indices = list(np.random.choice(all_indices, size=self.batch_size))
-        
-        return indices
 
     def get_func_train_indices(self):
         """
@@ -177,9 +166,9 @@ class COCOCaptionsDataset(Dataset):
 
         all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
 
-        indices = list(np.random.choice(all_indices_t, size=(self.batch_size)*2))
-        indices_t = indices[:self.batch_size]
-        indices_d = indices[self.batch_size:]
+        indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
+        possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t]
+        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
         
         return list(zip(indices_t, indices_d))
 

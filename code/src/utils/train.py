@@ -34,8 +34,8 @@ def validate_model(
              # get val indices
             indices = data_loader_val.dataset.get_func_train_indices()
             # create separate lists for retrieving the image emebddings
-            target_inds = torch.tensor([x[0] for x in indices]).long()
-            distractor_inds = torch.tensor([x[1] for x in indices]).long()
+            # target_inds = torch.tensor([x[0] for x in indices]).long()
+            # distractor_inds = torch.tensor([x[1] for x in indices]).long()
 
             new_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
             data_loader_val.batch_sampler.sampler = new_sampler
@@ -53,23 +53,21 @@ def validate_model(
 
             # Pass the inputs through the CNN-RNN model.
             # after retrieving the resnet embeddings
-            target_features = torch.index_select(embedded_imgs, 0, target_inds)
-            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
-            # concat image features
-            both_images = torch.cat((target_features, distractor_features), dim=-1)
+            # target_features = torch.index_select(embedded_imgs, 0, target_inds)
+            # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
 
             # compute val predictions and loss
-            both_images_features = encoder(both_images)
-            # distractor_features = encoder(distractor_features)
+            target_features = encoder(targets)#encoder(target_features)
+            distractor_features = encoder(distractors) #encoder(distractor_features)
 
-            # both_images = torch.cat((target_features, distractor_features), dim=-1)
-            outputs = decoder(both_images_features, target_captions)
+            both_images = torch.cat((target_features, distractor_features), dim=-1)
+            outputs = decoder(both_images, target_captions)
             
             # The size of the vocabulary.
             vocab_size = len(data_loader_val.dataset.vocab)
 
             # Calculate the batch loss.
-            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1))
+            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1))  
 
             val_running_loss += loss.item()
             # print("val running loss: ", val_running_loss)
@@ -128,8 +126,8 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretraining_2imgs_token0_1024dim_losses_2000vocab_"
-    val_csv_out = "../../data/pretraining_2imgs_token0_1024dim_val_losses_2000vocab_"
+    csv_out = "../../data/pretrain_byImage_prepend_1024dim_losses_6000vocab_wResNet_"
+    val_csv_out = "../../data/pretrain_byImage_prepend_1024dim_val_losses_6000vocab_wResNet_"
 
     speaker_losses=[]
     perplexities = []
@@ -150,23 +148,28 @@ def pretrain_speaker(
             
                     
             # Randomly sample a caption length, and sample indices with that length.
-            indices = data_loader.dataset.get_func_train_indices()
+            # indices = data_loader.dataset.get_func_train_indices()
+            indices = [(1,0)]
             # create separate lists for retrieving the image emebddings
             target_inds = torch.tensor([x[0] for x in indices]).long()
             distractor_inds = torch.tensor([x[1] for x in indices]).long()
+            # print("Indices targets: ", target_inds)
+            # print("Indices distractors: ", distractor_inds)
+            # print("Indices: ", indices)
             # Create and assign a batch sampler to retrieve a batch with the sampled indices.
             new_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
             data_loader.batch_sampler.sampler = new_sampler
             
             # Obtain the batch.
             targets, distractors, target_captions = next(iter(data_loader))
-
+            
             # Move batch of images and captions to GPU if CUDA is available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             targets = targets.to(device)
             distractors = distractors.to(device)
             target_captions = target_captions.to(device)
-            
+            # print("TARGET CAPTIONS shape: ", target_captions.shape)
+
             # Zero the gradients (reset).
             decoder.zero_grad()
             encoder.zero_grad()
@@ -174,22 +177,24 @@ def pretrain_speaker(
             # Pass the inputs through the CNN-RNN model.
             # after retrieving the resnet embeddings
             target_features = torch.index_select(embedded_imgs, 0, target_inds)
-            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
+            # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
 
+            print("Raw saved resnet features shape: ", target_features.shape)
+            target_features = encoder(targets)#encoder(target_features)
+            # print("Script encoder output: ", target_features)
+            distractor_features = encoder(distractors) #encoder(distractor_features)
+            # print("embedded resnet features shape: ", target_features.shape)
             # concat image features
             both_images = torch.cat((target_features, distractor_features), dim=-1)
-
-            both_images_features = encoder(both_images)
-            # distractor_features = encoder(distractor_features)
-
-            outputs = decoder(both_images_features, target_captions)
+            # print("Concat img features shape: ", both_images.shape)
+            outputs = decoder(both_images, target_captions)
             
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
 
             # Calculate the batch loss.
-            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1))
-            
+            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1)) # 
+            # print("Loss: ", loss)
             # Backward pass.
             loss.backward()
             
@@ -205,6 +210,7 @@ def pretrain_speaker(
         
             # Print training statistics (on same line).
             print('\r' + stats, end="")
+            # print(loss.item())
             sys.stdout.flush()
             
             # Print training statistics to file.
@@ -217,8 +223,8 @@ def pretrain_speaker(
 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-token0-1024dim-2000vocab-%d.pkl' % epoch))
-            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-token0-1024dim-2000vocab-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-byImage-prepend-1024dim-6000vocab-wResNet-%d.pkl' % epoch))
+            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-byImage-prepend-1024dim-6000vocab-wResNet-%d.pkl' % epoch))
 
             # compute validation loss
             with torch.no_grad():
@@ -242,8 +248,8 @@ def pretrain_speaker(
                 # check if we want to break
                 if early_stopper.early_stop:
                     # save the models
-                    torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-token0-1024dim-earlystopping-2000vocab-%d.pkl' % epoch))
-                    torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-token0-1024dim-earlystoppiing-2000vocab-%d.pkl' % epoch))
+                    torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-byImage-prepend-1024dim-earlystopping-6000vocab-wResNet-%d.pkl' % epoch))
+                    torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-byImage-prepend-1024dim-earlystopping-6000vocab-wResNet-%d.pkl' % epoch))
                     print("Early stopping steps loop!")
                     break
 

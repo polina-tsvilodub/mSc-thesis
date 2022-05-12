@@ -134,14 +134,26 @@ def get_loader(transform,
         pad_token=pad_word,
         vocab_from_file=vocab_from_file,
         vocab_from_pretrained=vocab_from_pretrained,
-        max_sequence_length=25,
+        max_sequence_length=15,
         categorize_imgs=categorize_imgs,
     )
     
 
     if mode == 'train':
         # Randomly sample a caption length, and sample indices with that length.
-        indices = dataset.get_train_indices()
+        indices = dataset.get_func_train_indices()
+        # Create and assign a batch sampler to retrieve a batch with the sampled indices.
+        initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
+        # data loader for COCO dataset.
+        data_loader = torch.utils.data.DataLoader(
+            dataset=dataset, 
+            num_workers=num_workers,
+            batch_sampler=torch.utils.data.sampler.BatchSampler(sampler=initial_sampler,
+                                                                batch_size=dataset.batch_size,
+                                                                drop_last=False))
+    elif mode == 'val':
+        # Randomly sample a caption length, and sample indices with that length.
+        indices = dataset.get_func_train_indices()
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.
