@@ -67,8 +67,7 @@ def play_game(
             # get the embeddings
             target_features = torch.index_select(embedded_imgs, 0, target_inds).squeeze(1)
             distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds).squeeze(1)
-            # concat image features BEFORE projecting
-            both_images = torch.cat((target_features, distractor_features), dim=-1)
+            
 
             # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
             new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
@@ -93,7 +92,10 @@ def play_game(
             
             ###### Pass the images through the speaker model.
             # project them with the linear layer
-            images_speaker_features = speaker_encoder(both_images)
+            target_speaker_features = speaker_encoder(target_features)
+            distractor_speaker_features = speaker_encoder(distractor_features)
+            # concat image features AFTER projecting
+            images_speaker_features = torch.cat((target_speaker_features, distractor_speaker_features), dim=-1)
             # sample caption from speaker 
             # zip images and target indices such that we can input correct image into speaker
             # preds_out = []
@@ -174,7 +176,7 @@ def play_game(
             
             # listener loss
             listener_loss = criterion(predictions, targets_list)
-            print("L loss: ", listener_loss)
+            # print("L loss: ", listener_loss)
             
             # Backward pass.
             speaker_loss.backward(retain_graph=True)

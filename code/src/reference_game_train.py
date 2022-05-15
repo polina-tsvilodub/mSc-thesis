@@ -127,7 +127,7 @@ vocab_size = len(data_loader_train.dataset.vocab)
 print("VOCAB SIZE: ", vocab_size)
 # Initialize the encoder and decoder.
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
-speaker_encoder = EncoderMLP(2*2048, 2*VISUAL_EMBED_SIZE)
+speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
 
 print("Model summaries:")
