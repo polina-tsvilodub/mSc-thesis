@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models 
+from . import resnet_encoder
 
 
 class ListenerEncoderRNN(nn.Module):
@@ -39,9 +40,9 @@ class ListenerEncoderRNN(nn.Module):
 
         return hiddens, self.hidden[0] 
 
-class ListenerEncoderCNN(EncoderCNN):
+class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
        
-    def forward(self, image_pairs, caption): 
+    def forward(self, images1, images2, caption): 
         """
         Performs forward pass through the listener ResNet 50 CNN.
         Computes the dot product between two images and the caption provided by the speaker.
@@ -62,15 +63,8 @@ class ListenerEncoderCNN(EncoderCNN):
             
         """
         # will be improved
-        images1 = torch.stack([im[0] for im in image_pairs])
-        images2 = torch.stack([im[1] for im in image_pairs])
-        features1 = self.resnet(images1) 
-        features2 = self.resnet(images2) 
-        # reshape features to shape (batch_size, -1) - adapt to first dim
-        features1 = features1.view(features1.size(0), -1)
-        features1 = self.embed(features1)
-        features2 = features2.view(features2.size(0), -1)
-        features2 = self.embed(features2)
+        features1 = self.embed(images1)
+        features2 = self.embed(images2)
         # compute dot product between images and caption
         # compute mean over words as sentence embedding representation
         dot_products_1 = torch.bmm(features1.view(images1.size()[0], 1, features1.size()[1]),

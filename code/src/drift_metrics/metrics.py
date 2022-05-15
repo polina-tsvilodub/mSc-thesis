@@ -1,5 +1,5 @@
 import torch
-import troch.nn as nn
+import torch.nn as nn
 from agents import resnet_encoder
 from . import image_captioner
 # language drift metric (a)
