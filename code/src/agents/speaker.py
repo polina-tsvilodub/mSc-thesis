@@ -31,7 +31,7 @@ class DecoderRNN(nn.Module):
         self.vocabulary_size = vocab_size
         self.visual_embed_size = visual_embed_size
         self.embed = nn.Embedding(self.vocabulary_size, self.embed_size) 
-        self.lstm = nn.LSTM(self.embed_size + 2*self.visual_embed_size, self.hidden_size , self.num_layers, batch_first=True) # self.embed_size+
+        self.lstm = nn.LSTM(self.embed_size, self.hidden_size , self.num_layers, batch_first=True) # self.embed_size+
         self.linear = nn.Linear(hidden_size, self.vocabulary_size)
         self.embed.weight.data.uniform_(-0.1, 0.1)
 
@@ -66,9 +66,8 @@ class DecoderRNN(nn.Module):
 
         embeddings = self.embed(captions)
         features = features.unsqueeze(1)
-        features_reps = features.repeat(1, embeddings.shape[1]-1, 1)
-        # PREpend the feature embedding as additional context AT EACH TIMESTEP, cut off END token        
-        embeddings = torch.cat((features_reps, embeddings[:, :-1,:]), dim=-1) # features_reps, dim=-1
+        # PREpend the feature embedding as additional context as first token, cut off END token        
+        embeddings = torch.cat((features, embeddings[:, :-1,:]), dim=1) # features_reps, dim=-1
         hiddens, self.hidden = self.lstm(embeddings)
         
         outputs = self.linear(hiddens)
@@ -99,12 +98,9 @@ class DecoderRNN(nn.Module):
         batch_size = inputs.shape[0] # batch_size is 1 at inference, inputs shape : (1, 1, embed_size)
         hidden = self.init_hidden(batch_size) # Get initial hidden state of the LSTM
         softmax = nn.Softmax(dim=-1)
-        # embed the start token, repeat once for each item in the batch
-        word_emb = self.embed(torch.tensor([0])).unsqueeze(0).repeat(inputs.shape[0], 1, 1)
-        # below will be optimized
+        
         while True:
-            inputs_lstm = torch.cat((inputs, word_emb), dim=-1)
-            lstm_out, hidden = self.lstm(inputs_lstm, hidden) # lstm_out shape : (1, 1, hidden_size)
+            lstm_out, hidden = self.lstm(inputs, hidden) # lstm_out shape : (1, 1, hidden_size)
             outputs = self.linear(lstm_out)  # outputs shape : (1, 1, vocab_size)
             raw_outputs.extend(outputs)
             # get the log probs of the actions
@@ -121,7 +117,7 @@ class DecoderRNN(nn.Module):
             
             ## Prepare to embed the last predicted word to be the new input of the lstm
             word_emb = self.embed(max_indice) # inputs shape : (1, embed_size)
-            word_emb = word_emb.unsqueeze(1) # inputs shape : (1, 1, embed_size)
+            inputs = word_emb.unsqueeze(1) # inputs shape : (1, 1, embed_size)
             
         # turn raw scores into log probabilities
         log_probs = torch.log(torch.stack(scores, dim=1))

@@ -27,7 +27,7 @@ def play_game(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = "functional_training_losses_prepend_singleMLP_vocab6000_"
+    csv_out = "functional_training_losses_token0_singleMLP_vocab6000_"
 
     speaker_losses_structural = []
     speaker_losses_functional = []
@@ -67,9 +67,7 @@ def play_game(
             # get the embeddings
             target_features = torch.index_select(embedded_imgs, 0, target_inds).squeeze(1)
             distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds).squeeze(1)
-            # concat image features BEFORE projecting
-            both_images = torch.cat((target_features, distractor_features), dim=-1)
-
+            
             # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
             new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
             
@@ -93,7 +91,12 @@ def play_game(
             
             ###### Pass the images through the speaker model.
             # project them with the linear layer
-            images_speaker_features = speaker_encoder(both_images)
+            target_speaker_features = speaker_encoder(target_features)
+            distractor_speaker_features = speaker_encoder(distractor_features)
+            print("S encoder grads : ", target_speaker_features.grad_fn.next_functions)
+            # concat image features AFTER projecting, target embedded first
+            both_images = torch.cat((target_speaker_features, distractor_speaker_features), dim=-1)
+
             # sample caption from speaker 
             # zip images and target indices such that we can input correct image into speaker
             # preds_out = []
@@ -102,10 +105,11 @@ def play_game(
             speaker_raw_output = []
             # get predicted caption and its log probability
             # print("Max length for sampling: ", captions.shape[1])
-            captions_pred, log_probs, raw_outputs = speaker_decoder.sample(images_speaker_features.unsqueeze(1), max_sequence_length=captions.shape[1])
-
+            captions_pred, log_probs, raw_outputs = speaker_decoder.sample(both_images.unsqueeze(1), max_sequence_length=captions.shape[1])
+            
             # transform predicted word indices to tensor
-            preds_out = torch.stack(captions_pred, dim=-1)#.squeeze(-1)    
+            preds_out = torch.stack(captions_pred, dim=-1)#.squeeze(-1)  
+            print("Raw scores grad: ", preds_out.grad_fn)  
             #######
             # CREATE TARGET DIST RANDOM PAIRS FOR THE LISTENER
             targets_list = []
@@ -212,10 +216,10 @@ def play_game(
                 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-singleImgs-prepend-vocab6000-%d.pkl' % epoch))
-            torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-prepend-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-singleImgs-preprend-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-singleImgs-prepend-vocab6000-%d.pkl' % epoch))
+            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
+            torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
+            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-singleImgs-token0-vocab6000-%d.pkl' % epoch))
+            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
             
         # save the training metrics
         df_out = pd.DataFrame({

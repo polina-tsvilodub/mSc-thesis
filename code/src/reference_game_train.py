@@ -40,14 +40,14 @@ VOCAB_FILE = "../../data/vocab.pkl"
 # Model Dimensions
 EMBED_SIZE = 1024 # dimensionality of word embeddings
 HIDDEN_SIZE = 512 # number of features in hidden state of the LSTM decoder
-VISUAL_EMBED_SIZE = 1024 # dimensionality of visual embeddings
+VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 LISTENER_EMBED_SIZE = 512
 # Other training parameters
 BATCH_SIZE = 64
 EPOCHS = 5#20 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/reference_game_prepend_singleMLP_1024dim_6000vocab_wFeatures_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/reference_game_token0_singleMLP_1024dim_6000vocab_wFeatures_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -127,7 +127,7 @@ vocab_size = len(data_loader_train.dataset.vocab)
 print("VOCAB SIZE: ", vocab_size)
 # Initialize the encoder and decoder.
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
-speaker_encoder = EncoderMLP(2*2048, 2*VISUAL_EMBED_SIZE)
+speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
 
 print("Model summaries:")
