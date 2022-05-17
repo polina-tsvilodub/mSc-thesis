@@ -34,8 +34,9 @@ class ListenerEncoderRNN(nn.Module):
         # initialize hidden layer
         # check if this isn't reinitializing the hidden state in the middle of the sequence
 #         self.hidden = self.init_hidden(self.hidden_size)
-        
+        print("captions shape in listener rnn : ", captions.shape)
         embeddings = self.embed(captions)
+        print("embeddings in listener rnn:", embeddings.shape)
         hiddens, self.hidden = self.lstm(embeddings)
 
         return hiddens, self.hidden[0] 

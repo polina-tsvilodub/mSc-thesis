@@ -38,6 +38,7 @@ def play_game(
     # TODO add metrics
 
     lambda_s = 0.1
+    torch.autograd.set_detect_anomaly(True)
 
     embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
     speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_encoder.embed.parameters()) 
@@ -108,8 +109,11 @@ def play_game(
             captions_pred, log_probs, raw_outputs = speaker_decoder.sample(both_images.unsqueeze(1), max_sequence_length=captions.shape[1])
             
             # transform predicted word indices to tensor
-            preds_out = torch.stack(captions_pred, dim=-1)#.squeeze(-1)  
-            print("Raw scores grad: ", preds_out.grad_fn)  
+            # preds_out = torch.stack(captions_pred, dim=-1)#.squeeze(-1)  
+            print(captions_pred[0])
+            print("Raw indices grad: ", captions_pred.grad_fn)  
+            print("Log probs grad: ", log_probs.grad_fn)
+            print("Raw out grad: ", raw_outputs.grad_fn)
             #######
             # CREATE TARGET DIST RANDOM PAIRS FOR THE LISTENER
             targets_list = []
@@ -135,10 +139,10 @@ def play_game(
             #######    
 
 
-
+            print("Captions pred before L RNN; ", captions_pred.shape)
 
             # pass images and generated message form speaker through listener
-            hiddens_scores, hidden = listener_rnn(preds_out) #  captions_pred
+            hiddens_scores, hidden = listener_rnn(captions_pred) #   preds_out
             # TODO check if these should be tuples or separate img1, img2 lists for using pre-extracted features
             predictions = listener_encoder(features1, features2, hidden.squeeze(0)) # train_pairs
             # print("Listener encoder grads:", predictions.grad_fn.next_functions)
@@ -159,7 +163,7 @@ def play_game(
             # print("Rewards: ", rewards)
             # compute REINFORCE update
             rl_grads = update_policy.update_policy(rewards,  log_probs) # check if log probs need to be stacked first
-        
+            print("RL rgrad: ", rl_grads.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions)
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
             
@@ -171,8 +175,11 @@ def play_game(
             # (last implemented just like for pretraining), this is the structural loss component
             
             # combine structural loss and functional loss for the speaker # torch.stack(speaker_raw_output)
-            loss_structural = criterion(torch.stack(raw_outputs).contiguous().view(-1, vocab_size), captions.reshape(-1)) 
+            loss_structural = criterion(raw_outputs.contiguous().view(-1, vocab_size), captions.reshape(-1)) 
+            print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
             speaker_loss =  lambda_s*loss_structural + rl_grads
+            print("Speaker LOSS grads ", speaker_loss.grad_fn )
+            print("Speaker LOSS grads ", speaker_loss.grad_fn.next_functions )
             
             print("L_s: ", loss_structural, " L_f: ", rl_grads)
             
