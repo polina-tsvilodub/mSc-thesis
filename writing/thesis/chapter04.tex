@@ -1,1 +1,57 @@
-Dataset description goes here.
+This section describes the data used in the present experiments, the architecture of the agents, experimental procedures, as well as results. There are two agents---the speaker and the listener agents---whose architectures are shared across all experiments and, therefore, described once. At first, the general set up of the reference game common to all experiments is described, while experiment-specific details are provided in the respective sections.  
+
+\section{Datasets}
+
+Sources.
+\subsection{MS COCO}
+Descriptive stats, splits that were used.
+\subsection{3dshapes}
+Descriptive stuff.
+\subsubsection{Caption Generation}
+Procedure. 
+
+\section{Reference Game}
+
+The current experiment are limited to using one target image in context of only one distractor, but the current experiment do not depend on this confinement.
+
+\section{Architecture}
+The architecture of the agents follows \textcite{lazaridou2020multi}, except minor details to be explained below. \textcite{lazaridou2020multi} explore different ways to parametrize the speaker agent, and the current work replicates the ``multi-task learning'' parametrization (p. 5). This choice is motivated by the fact that among their architectures, this is the only one where the speaker agent learns to produce messages and its core image captioning capability while having access to both the target and the distractors, as opposed to models relying on sampling captions from a pretrained single-image captioning models.\footnote{I think that the multi-task learning set up by \textcite{lazaridou2020multi} really doesn't use pretraining---see their Appendix A ResNet module note.} 
+
+Both agents have two components: a visual embedding module which takes as input the target and distractor images, and a language module. More specifically, the visual module for both agents embeds image features which were extracted using the same pre-trained ResNet50 model \parencite{he2016deep}. The weights were accessed through the \texttt{torchvision.models} API \parencite{marcel2010torchvision}. Features from all images of the dataset were extracted and saved and then retrieved when training all agents. 
+The language module differs for the two agents, so details are provided below. 
+The code for all experiments can be found under \url{https://github.com/polina-tsvilodub/mSc-thesis/tree/refGame-noPretrain-token0}. 
+
+\subsection{Speaker}
+The speaker receives as input tuples \texttt{(targets, distractors)}, where \texttt{targets} and \texttt{distractors} are features extracted from the ResNet50 for the sampled pairs, respectively. That is, the speaker knows which of the the two images in a given iteration of the reference game is the target for which the message should be produced. 
+
+The speaker model consists of a linear layer which projects the 2048-dimensional image features to 512-dimensional embedding space. \pt{Not sure if this is also different from what \textcite{lazaridou2020multi} do because of their details in the appendix.} The linear layer is first applied to the target images and then to the distractors, resulting in embeddings $i_t$ and $i_d$, respectively. The vectors are concatenated to $[i_t; i_d]$, the target embeddings always being the first ones, such that the speaker network implicitly knows which features represent the target. These 1024-dimensional vectors are used as input to the speaker's language module. The core of the module is the recurrent Long Short-Term Memory (LSTM) cell \parencite{hochreiter1997long}. More specifically, the language module consists of three layers: an embedding layer, mapping the vocabulary to 1024-dimensional word embeddings, a one-layer LSTM with 512-dimensional hidden and cell states; and a linear layer on top, mapping the last hidden state of the LSTM to a score over the vocabulary. The size of the vocabulary $V$ is 4054, including four special tokens \texttt{START, END, UNK, PAD}. This vocabulary was constructed from the captions in the MS COCO dataset and comprises over \pt{95\%} of the token distribution mass, while comprising \pt{X \% of unique tokens occuring in all captions}. This vocabulary size was chosen as a good trade-off between a sufficient variety of words that the speaker can choose to describe the images and an action space size which is still learnabale in the current set-up. 
+
+During the reference game, the speaker receives the pairs of images, embeds them and passes the concatenated embedding as input to the LSTM. In order to sample the caption for the target, this embedding is prepended to the embedding of  the \texttt{START} token. This two-token sequence is then passed to the LSTM which generates further tokens, until the \texttt{END} token is sampled or the maximum caption length is achieved. The design wherein the image embedding is used as the first token differs from the original design by \textcite{lazaridou2020multi} who prepend the image embedding to each word embedding at each generation time step. This decision had to be made because exploratory experiments showed that the original arcitecture doesn't work for the data at hand, possibly due to the larger parameter space.\footnote{\pt{Check and provide numbers.}} This is also a common practice in image captioning literature \pt{REF!}. Another possible approach that could be explored in future work would be to initialize the hidden states of the LSTM with the visual embeddings. In this case, the hidden and cell states of the LSTM were initialized with random vallues sampled from the standard normal distribution.The embedding and last linear layers' weights were initialized with random values sampled from the uniform distribution between -0.1 and 0.1, the biases were initialized with zeroes.  
+
+Max length / truncating captions to 15. 
+\pt{Num of parameters. Make a graphic of the models and / or the reference game}.
+
+\subsection{Listener}
+The listener receives as input the tuples \texttt{(images1, images2, messages)}, the first two inputs being ResNet50 features of the image pairs, input in random order, such that the agent doesn't know which image is the target. The \texttt{message} is the caption produced by the speaker. 
+
+The message is passed to the language module which consists of an embedding layer, mapping the vocabulary to 512-dimensional word embeddings, and a one-layer LSTM with 512-dimensional hidden and cell states. All weights are initialized analagously to the respective weights of the speaker model. The hidden cell state $h_i$ at the last time step is used as the final message representation. 
+The visual module of the listener consists of a linear layer which also projects the 2048-dimensional image features to a 512-dimensiobnal embedding space. The images are passed through the linear layer one after the other, resulting in embeddings $i_1$ and $i_2$. Finally, the listener computes the dot products between each image embedding and the message embedding \pt{formula ref}. \pt{Num of parameters.}
+
+The next section describes how these agents were trained in the reference game setting.
+
+\subsection{General Training Details}
+
+All experiments were trained with a batch size 64, using the Adam optimizer with a learning rate  of 0.001 \parencite{kingma2014adam}. The models were trained for \pt{X epochs, early stopping. Metric computation along the way. Where it was trained.}. 
+
+\section{Experiments}
+
+\subsection{Baseline}
+
+\subsubsection{Training}
+\subsubsection{Results}
+
+\subsection{Similar Pairs}
+
+\subsection{3Dshapes Experiment}
+
+\subsection{Fixed Listener Experiment}
