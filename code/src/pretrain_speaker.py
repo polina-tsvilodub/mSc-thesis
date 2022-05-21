@@ -58,6 +58,8 @@ domains_list = {
     DOWNLOAD_DIR_TRAIN: ["annotations/annotations_trainval2014.zip",
     "zips/train2014.zip"], 
 }
+# path to pre-saved image features file
+embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
 
 #########
 
@@ -95,6 +97,7 @@ data_loader_train = get_loader(
     vocab_file=VOCAB_FILE,
     vocab_from_file=VOCAB_FROM_FILE,
     download_dir=DOWNLOAD_DIR_TRAIN,
+    embedded_imgs=embedded_imgs,
 )
 
 data_loader_val = get_loader(
@@ -105,6 +108,7 @@ data_loader_val = get_loader(
     vocab_file=VOCAB_FILE,
     vocab_from_file=True,
     download_dir=DOWNLOAD_DIR_VAL,
+    embedded_imgs=embedded_imgs,
 )
 # truncate the val split
 data_loader_val.dataset.ids = torch.load("pretrain_val_img_IDs_2imgs_main.pt").tolist()#data_loader_val.dataset.ids[:NUM_VAL_IMGS]

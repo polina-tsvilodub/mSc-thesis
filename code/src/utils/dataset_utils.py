@@ -33,6 +33,7 @@ class COCOCaptionsDataset(Dataset):
             unk_token,
             pad_token, 
             vocab_from_file, 
+            embedded_imgs,
             vocab_from_pretrained=False,
             max_sequence_length=0,
             categorize_imgs=False, # flag whether the images need to be sorted
@@ -45,6 +46,8 @@ class COCOCaptionsDataset(Dataset):
                                 file, pad_token, vocab_from_file, vocab_from_pretrained) 
         self.max_sequence_length = max_sequence_length
         self.pad_token=pad_token
+        self.embedded_imgs=embedded_imgs
+        self.tokenizer = get_tokenizer("basic_english")
         # some distinctions below for Train and test mode
         if mode == "train":
             self.image_dir = os.path.join(download_dir, "train2014") # download_dir needs to be data/train/ then 
@@ -113,30 +116,43 @@ class COCOCaptionsDataset(Dataset):
 
             # get distarctor
             dist_id = self.ids[distractor_idx]
+            distractor_caption = self.coco.anns[dist_id]['caption']
             dist_img_id = self.coco.anns[dist_id]['image_id']
             distractor_path = self.coco.loadImgs(dist_img_id)[0]['file_name']
 
             # Convert image to tensor and pre-process using transform
             target_image = Image.open(os.path.join(self.image_dir, target_path)).convert('RGB')
             target_image = self.transform(target_image)
+            # Get the pre-extracted features
+            target_features = self.embedded_imgs[target_idx, :].squeeze(0) #torch.index_select(self.embedded_imgs, 0, target_idx).squeeze(1)
 
             distractor_image = Image.open(os.path.join(self.image_dir, distractor_path)).convert('RGB')
             distractor_image = self.transform(distractor_image)
+            # Get pre-extracted features
+            distractor_features = self.embedded_imgs[distractor_idx, :].squeeze(0) # torch.index_select(self.embedded_imgs, 0, distractor_idx).squeeze(1)
 
-            tokenizer = get_tokenizer("basic_english")
-            tokens = tokenizer(str(target_caption).lower())
+            tokens = self.tokenizer(str(target_caption).lower())
+            tokens_dist = self.tokenizer(str(distractor_caption).lower())
             # Convert caption to tensor of word ids, append start and end tokens.
             target_caption = []
+            distractor_caption = []
             target_caption.append(self.vocab(self.vocab.start_word))
+            distractor_caption.append(self.vocab(self.vocab.start_word))
 
             # check if the sequence needs to be padded or truncated
             if self.max_sequence_length != 0:
                 tokens = tokens[:self.max_sequence_length]
+                tokens_dist = tokens_dist[:self.max_sequence_length]
 
             target_caption.extend([self.vocab(token) for token in tokens])
             target_caption.append(self.vocab(self.vocab.end_word))
             target_caption = torch.Tensor(target_caption).long()
-            return target_image, distractor_image, target_caption
+
+            distractor_caption.extend([self.vocab(token) for token in tokens_dist])
+            distractor_caption.append(self.vocab(self.vocab.end_word))
+            distractor_caption = torch.Tensor(distractor_caption).long()
+
+            return target_image, distractor_image, target_features, distractor_features, target_caption # , distractor_caption
 
         # obtain image if in test mode
         else:

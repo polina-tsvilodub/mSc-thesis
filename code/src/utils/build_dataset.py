@@ -80,6 +80,7 @@ def get_loader(transform,
                download_dir="../../../data/val/",
                vocab_from_pretrained=False,
                categorize_imgs=False,
+               embedded_imgs="COCO_train_ResNet_features_reshaped.pt",
               ):
     """Returns the data loader.
     Args:
@@ -136,6 +137,7 @@ def get_loader(transform,
         vocab_from_pretrained=vocab_from_pretrained,
         max_sequence_length=15,
         categorize_imgs=categorize_imgs,
+        embedded_imgs=embedded_imgs,
     )
     
 

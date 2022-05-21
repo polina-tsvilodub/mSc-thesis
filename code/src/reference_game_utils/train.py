@@ -40,7 +40,7 @@ def play_game(
     lambda_s = 0.1
     torch.autograd.set_detect_anomaly(True)
 
-    embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
+    # embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
     speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_decoder.project.parameters()) 
     listener_params = list(listener_rnn.lstm.parameters()) + list(listener_encoder.embed.parameters()) 
     # print("Speaker decoder params: ", speaker_decoder.state_dict().keys())
@@ -63,19 +63,20 @@ def play_game(
             # Randomly sample a caption length, and sample indices with that length.
             indices_pairs = data_loader.dataset.get_func_train_indices()
             # get the indices for retrieving the pretrained embeddings 
-            target_inds = torch.tensor([x[0] for x in indices_pairs]).long()
-            distractor_inds = torch.tensor([x[1] for x in indices_pairs]).long()
+            # target_inds = torch.tensor([x[0] for x in indices_pairs]).long()
+            # distractor_inds = torch.tensor([x[1] for x in indices_pairs]).long()
             # get the embeddings
-            target_features = torch.index_select(embedded_imgs, 0, target_inds).squeeze(1)
-            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds).squeeze(1)
+            # target_features = torch.index_select(embedded_imgs, 0, target_inds).squeeze(1)
+            # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds).squeeze(1)
             
             # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
             new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
             
             data_loader.batch_sampler.sampler = new_sampler_pairs
             # Obtain the target batch.
-            images1, images2, captions = next(iter(data_loader))
+            images1, images2, target_features, distractor_features, captions = next(iter(data_loader))
             # create target-distractor image tuples
+            print("traget features retrieved from dataloader: ", target_features.shape)
             # train_pairs = list(zip(images1, images2))
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             captions = captions.to(device)    

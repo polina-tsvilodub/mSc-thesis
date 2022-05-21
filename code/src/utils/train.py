@@ -152,8 +152,8 @@ def pretrain_speaker(
             indices = data_loader.dataset.get_func_train_indices()
             # indices = [(1,0)]
             # create separate lists for retrieving the image emebddings
-            target_inds = torch.tensor([x[0] for x in indices]).long()
-            distractor_inds = torch.tensor([x[1] for x in indices]).long()
+            # target_inds = torch.tensor([x[0] for x in indices]).long()
+            # distractor_inds = torch.tensor([x[1] for x in indices]).long()
             # print("Indices targets: ", target_inds)
             # print("Indices distractors: ", distractor_inds)
             # print("Indices: ", indices)
@@ -162,7 +162,7 @@ def pretrain_speaker(
             data_loader.batch_sampler.sampler = new_sampler
             
             # Obtain the batch.
-            targets, distractors, target_captions = next(iter(data_loader))
+            targets, distractors, target_features, distractor_features, target_captions = next(iter(data_loader))
             
             # Move batch of images and captions to GPU if CUDA is available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -177,8 +177,8 @@ def pretrain_speaker(
             
             # Pass the inputs through the CNN-RNN model.
             # after retrieving the resnet embeddings
-            target_features = torch.index_select(embedded_imgs, 0, target_inds)
-            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
+            # target_features = torch.index_select(embedded_imgs, 0, target_inds)
+            # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
 
             # print("Raw saved resnet features shape: ", target_features.shape)
             # target_features = encoder(targets)#encoder(target_features)
