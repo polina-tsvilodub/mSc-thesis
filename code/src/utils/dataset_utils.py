@@ -52,7 +52,7 @@ class COCOCaptionsDataset(Dataset):
             _ids = list(self.coco.anns.keys())
             shuffle(_ids)
             # retrieve a subset of images for pretraining
-            self.ids = torch.load("pretrain_img_IDs_2imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+            self.ids = torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             # set the image IDs for validation during early stopping to avoid overlapping images
             self.ids_val = torch.load("pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')

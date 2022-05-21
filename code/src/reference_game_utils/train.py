@@ -15,7 +15,7 @@ def play_game(
     total_steps,
     data_loader,
     data_loader_val, 
-    speaker_encoder,
+    # speaker_encoder,
     speaker_decoder,
     listener_encoder, 
     listener_rnn,
@@ -27,7 +27,7 @@ def play_game(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = "functional_training_losses_token0_singleMLP_vocab6000_"
+    csv_out = "functional_training_losses_token0_noEnc_vocab4000_"
 
     speaker_losses_structural = []
     speaker_losses_functional = []
@@ -41,7 +41,7 @@ def play_game(
     torch.autograd.set_detect_anomaly(True)
 
     embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
-    speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_encoder.embed.parameters()) 
+    speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_decoder.project.parameters()) 
     listener_params = list(listener_rnn.lstm.parameters()) + list(listener_encoder.embed.parameters()) 
     # print("Speaker decoder params: ", speaker_decoder.state_dict().keys())
     # print("speaker encoder params:", speaker_encoder.state_dict().keys())
@@ -56,7 +56,7 @@ def play_game(
         for i_step in range(1, total_steps+1):
             # set mode of the models
             speaker_decoder.train()
-            speaker_encoder.train()
+            # speaker_encoder.train()
             listener_encoder.train()
             listener_rnn.train()
 
@@ -85,28 +85,28 @@ def play_game(
             # print("Tensor targets list: ", targets_list)
             ############################
             # Zero the gradients (reset).
-            speaker_encoder.zero_grad()
+            # speaker_encoder.zero_grad()
             speaker_decoder.zero_grad()
             listener_encoder.zero_grad()
             listener_rnn.zero_grad()
             
             ###### Pass the images through the speaker model.
             # project them with the linear layer
-            target_speaker_features = speaker_encoder(target_features)
-            distractor_speaker_features = speaker_encoder(distractor_features)
-            print("S encoder grads : ", target_speaker_features.grad_fn.next_functions)
+            # target_speaker_features = speaker_encoder(target_features)
+            # distractor_speaker_features = speaker_encoder(distractor_features)
+            # print("S encoder grads : ", target_speaker_features.grad_fn.next_functions)
             # concat image features AFTER projecting, target embedded first
-            both_images = torch.cat((target_speaker_features, distractor_speaker_features), dim=-1)
-
+            # both_images = torch.cat((target_speaker_features, distractor_speaker_features), dim=-1)
+            both_images = [target_features, distractor_features]
             # sample caption from speaker 
             # zip images and target indices such that we can input correct image into speaker
             # preds_out = []
-            log_probs_batch = []
+            # log_probs_batch = []
             speaker_features_batch = []
             speaker_raw_output = []
             # get predicted caption and its log probability
             # print("Max length for sampling: ", captions.shape[1])
-            captions_pred, log_probs, raw_outputs = speaker_decoder.sample(both_images.unsqueeze(1), max_sequence_length=captions.shape[1])
+            captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1)
             
             # transform predicted word indices to tensor
             # preds_out = torch.stack(captions_pred, dim=-1)#.squeeze(-1)  
@@ -144,26 +144,28 @@ def play_game(
             # pass images and generated message form speaker through listener
             hiddens_scores, hidden = listener_rnn(captions_pred) #   preds_out
             # TODO check if these should be tuples or separate img1, img2 lists for using pre-extracted features
-            predictions = listener_encoder(features1, features2, hidden.squeeze(0)) # train_pairs
+            predictions, scores = listener_encoder(features1, features2, hidden.squeeze(0)) # train_pairs
             # print("Listener encoder grads:", predictions.grad_fn.next_functions)
             # print("Listener encoder grads:", predictions.grad_fn.next_functions[0][0].next_functions)
             # print("Listener encoder grads:", predictions.grad_fn.next_functions[0][0].next_functions[0][0])
             # print("Listener encoder grads:", predictions.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0])
             # retrieve the index of the larger dot product
-            predicted_max_dots, predicted_inds = torch.max(predictions, dim = 1)
+            # predicted_max_dots, predicted_inds = torch.max(predictions, dim = 1)
             ######
             # RL step
     #         log_probs = torch.stack(log_probs_batch)
             # if target index and output index match, 1, else -1
             
-            accuracy = torch.sum(torch.eq(targets_list, predicted_inds).to(torch.int64))/predicted_inds.shape[0]
-            # print("Batch average accuracy: ", accuracy)
+            accuracy = torch.sum(torch.eq(targets_list, predictions).to(torch.int64))/predictions.shape[0]
+            print("Batch average accuracy: ", accuracy)
             accuracies.append(accuracy.item())
-            rewards = [1 if x else -1 for x in torch.eq(targets_list, predicted_inds).tolist()]
-            # print("Rewards: ", rewards)
+            rewards = [1 if x else -1 for x in torch.eq(targets_list, predictions).tolist()]
+            print("Rewards: ", rewards)
             # compute REINFORCE update
-            rl_grads = update_policy.update_policy(rewards,  log_probs) # check if log probs need to be stacked first
-            print("RL rgrad: ", rl_grads.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions)
+            rl_grads = update_policy.update_policy(rewards, log_probs, entropies) # check if log probs need to be stacked first
+            # print("RL rgrad: ", rl_grads.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions)
+            # compute entropies for each datapoint, to be weighted into loss
+            
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
             
@@ -175,7 +177,7 @@ def play_game(
             # (last implemented just like for pretraining), this is the structural loss component
             
             # combine structural loss and functional loss for the speaker # torch.stack(speaker_raw_output)
-            loss_structural = criterion(raw_outputs.contiguous().view(-1, vocab_size), captions.reshape(-1)) 
+            loss_structural = criterion(raw_outputs.transpose(1,2), captions) 
             print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
             speaker_loss =  lambda_s*loss_structural + rl_grads
             print("Speaker LOSS grads ", speaker_loss.grad_fn )
@@ -184,7 +186,7 @@ def play_game(
             print("L_s: ", loss_structural, " L_f: ", rl_grads)
             
             # listener loss
-            listener_loss = criterion(predictions, targets_list)
+            listener_loss = criterion(scores, targets_list)
             print("L loss: ", listener_loss)
             
             # Backward pass.
@@ -223,10 +225,10 @@ def play_game(
                 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
+            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-noEnc-token0-vocab4000-%d.pkl' % epoch))
+            # torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
+            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-noEnc-token0-vocab4000-%d.pkl' % epoch))
+            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-noEnc-token0-vocab4000-%d.pkl' % epoch))
             
         # save the training metrics
         df_out = pd.DataFrame({

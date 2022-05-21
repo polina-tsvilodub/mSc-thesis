@@ -1,6 +1,6 @@
 import torch
 
-def update_policy(rewards, log_probs):
+def update_policy(rewards, log_probs, entropies, entropy_weight=0.1):
     """
     This function calculates the weight updates accoring to the REINFORCE rule.
     
@@ -8,8 +8,12 @@ def update_policy(rewards, log_probs):
     ----
         rewards: list
             List of rewards of length batch_size
-        log_probs: torch.tensor((batch_size, caption_length))
+        log_probs: torch.tensor((batch_size,))
             Log probabilities of each word in each predicted sentence.
+        entropies: torch.tensor(batch_size, caption_length)
+            Tensor of sentence entropies
+        entropy_weight: float
+            Weight with which entropy regularization should be applied.    
     Returns:
     -----
         policy_gradient: torch.tensor
@@ -18,8 +22,12 @@ def update_policy(rewards, log_probs):
 
     policy_gradient = []
     sentence_prob = log_probs.sum(dim=1)
-    for log_prob, Gt in zip(sentence_prob, rewards):
-        policy_gradient.append(-log_prob * Gt)
+    sentence_entropies = entropies.sum(dim=1)
+    for log_prob, Gt, h in zip(sentence_prob, rewards, sentence_entropies):
+        # TODO double check sign
+        # print("Regularization term: ", h, log_prob, Gt)
+
+        policy_gradient.append(-(log_prob * Gt + entropy_weight * h))
     # here, we average over the batch to match the CCE operation for the joint loss
     policy_gradient = torch.stack(policy_gradient).mean()
     

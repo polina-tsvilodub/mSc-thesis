@@ -63,6 +63,7 @@ class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
                 List of predicted target indices. 
             
         """
+        softmax = nn.Softmax(dim=-1)
         # will be improved
         features1 = self.embed(images1)
         features2 = self.embed(images2)
@@ -74,7 +75,17 @@ class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
                                    caption.view(images2.size()[0], features2.size()[1], 1))
         # compose targets and distractors dot products
         # stack into pairs, assuming dim=0 is the batch dimension
-        pairs = torch.stack((dot_products_1, dot_products_2), dim=1) 
-        pairs_flat = pairs.squeeze(-1).squeeze(-1)
-        
-        return pairs_flat        
+        scores = torch.stack((dot_products_1, dot_products_2), dim=1) 
+        scores_flat = scores.squeeze(-1).squeeze(-1)
+        probs = softmax(scores_flat)
+        print("Listener action probs: ", probs.shape)
+        # sample for training mode
+        if self.training:
+            print("Success L train mode")
+            cat_dist = torch.distributions.categorical.Categorical(probs)
+            choices = cat_dist.sample()
+            
+        else:
+            predicted_max_probs, choices = torch.max(probs, dim = 1)
+        print("Choices: ", choices)
+        return choices, scores_flat        

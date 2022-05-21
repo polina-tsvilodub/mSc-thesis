@@ -29,13 +29,13 @@ random.seed(42)
 IMAGE_SIZE = 256
 
 # Vocabulary parameters
-VOCAB_THRESHOLD = 11 # minimum word count threshold
+VOCAB_THRESHOLD = 25 # minimum word count threshold
 VOCAB_FROM_FILE = True # if True, load existing vocab file
 VOCAB_FROM_PRETRAINED = False
 # Fixed length allowed for any sequence
 MAX_SEQUENCE_LENGTH = 15
 # path / name of vocab file
-VOCAB_FILE = "../../data/vocab.pkl"
+VOCAB_FILE = "../../data/vocab4000.pkl"
 
 # Model Dimensions
 EMBED_SIZE = 1024 # dimensionality of word embeddings
@@ -47,7 +47,7 @@ BATCH_SIZE = 64
 EPOCHS = 5#20 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/reference_game_token0_singleMLP_1024dim_6000vocab_wFeatures_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/reference_game_token0_noEnc_1024dim_4000vocab_wFeatures_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -127,7 +127,7 @@ vocab_size = len(data_loader_train.dataset.vocab)
 print("VOCAB SIZE: ", vocab_size)
 # Initialize the encoder and decoder.
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
-speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
+# speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
 
 print("Model summaries:")
@@ -140,7 +140,7 @@ listener_rnn = ListenerEncoderRNN(LISTENER_EMBED_SIZE, HIDDEN_SIZE, vocab_size)
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-speaker_encoder.to(device)
+# speaker_encoder.to(device)
 speaker_decoder.to(device)
 listener_encoder.to(device)
 listener_rnn.to(device)
@@ -167,7 +167,7 @@ play_game(
     total_steps=total_steps,
     data_loader=data_loader_train, 
     data_loader_val=data_loader_val,
-    speaker_encoder=speaker_encoder,
+    # speaker_encoder=speaker_encoder,
     speaker_decoder=speaker_decoder,
     listener_encoder=listener_encoder, 
     listener_rnn=listener_rnn,

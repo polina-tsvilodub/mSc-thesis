@@ -14,8 +14,8 @@ import random
 
 
 # set random seed
-torch.manual_seed(42)
-random.seed(42)
+torch.manual_seed(1234)
+random.seed(1234)
 
 #######
 # HYPERPARAMS 
@@ -25,25 +25,25 @@ random.seed(42)
 IMAGE_SIZE = 256
 
 # Vocabulary parameters
-VOCAB_THRESHOLD = 11 # minimum word count threshold
+VOCAB_THRESHOLD = 25 # minimum word count threshold
 VOCAB_FROM_FILE = True # if True, load existing vocab file
 VOCAB_FROM_PRETRAINED = False
 # Fixed length allowed for any sequence
 MAX_SEQUENCE_LENGTH = 15
 # path / name of vocab file
-VOCAB_FILE = "../../data/vocab.pkl"
+VOCAB_FILE = "../../data/vocab4000.pkl"
 
 # Model Dimensions
-EMBED_SIZE = 2048 # 1024 # dimensionality of word embeddings
+EMBED_SIZE = 1024 # 1024 # dimensionality of word embeddings
 HIDDEN_SIZE = 512 # number of features in hidden state of the LSTM decoder
-VISUAL_EMBED_SIZE = 1024 # dimensionality of visual embeddings
+VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 
 # Other training parameters
 BATCH_SIZE = 64
 EPOCHS = 20 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/pretraining_speaker_byImage_prepend_1024dim_6000vocab_wResNet_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/CCE_pretraining_speaker_noEnc_prepend_1024dim_4000vocab_rs1234_cont_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -123,8 +123,8 @@ vocab_size = len(data_loader_train.dataset.vocab)
 print("VOCAB SIZE: ", vocab_size)
 # Initialize the encoder and decoder.
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
-encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
-old_encoder = EncoderCNN(VISUAL_EMBED_SIZE)
+# encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
+# old_encoder = EncoderCNN(VISUAL_EMBED_SIZE)
 # print("State dict keys: ", torch.load_state_dict("models/encoder-2imgs-1.pkl").keys())
 # pretrained_dict = torch.load("models/encoder-2imgs-1.pkl")
 # encoder_dict = encoder.state_dict()
@@ -137,18 +137,18 @@ old_encoder = EncoderCNN(VISUAL_EMBED_SIZE)
 # print("LOADED ENCODER WEIGHTS!")
 # encoder.load_state_dict(torch.load("models/encoder-2imgs-1024dim-2000vocab-1.pkl"))
 decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
-# decoder.load_state_dict(torch.load("models/decoder-2imgs-1024dim-2000vocab-1.pkl"))
+# decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-1024dim-4000vocab-rs1234-2.pkl"))
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-encoder.to(device)
+# encoder.to(device)
 decoder.to(device)
 
 # Define the loss function. 
 criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
 # Specify the learnable parameters of the model.
-params = list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(encoder.embed.parameters())
+params = list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(decoder.project.parameters())
 
 # print("Encoder MLP params: ", list(encoder.embed.parameters()))
 # print("Encoder CNN params: ", list(old_encoder.embed.parameters()))
@@ -166,7 +166,7 @@ pretrain_speaker(
     total_steps=total_steps,
     data_loader=data_loader_train, 
     data_loader_val=data_loader_val,
-    encoder=old_encoder,
+    # encoder=old_encoder,
     decoder=decoder,
     params=params,
     criterion=criterion,

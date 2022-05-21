@@ -84,7 +84,7 @@ def pretrain_speaker(
     total_steps,
     data_loader,
     data_loader_val, 
-    encoder,
+    # encoder,
     decoder,
     params,
     criterion,
@@ -126,8 +126,8 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretrain_byImage_prepend_1024dim_losses_6000vocab_wResNet_"
-    val_csv_out = "../../data/pretrain_byImage_prepend_1024dim_val_losses_6000vocab_wResNet_"
+    csv_out = "../../data/CCE-pretrain_noEnc_prepend_1024dim_losses_4000vocab_rs1234_cont_"
+    val_csv_out = "../../data/pretrain_noEnc_prepend_1024dim_val_losses_4000vocab_rs1234_cont_"
 
     speaker_losses=[]
     perplexities = []
@@ -136,20 +136,21 @@ def pretrain_speaker(
     # init the early stopper
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
-    embedded_imgs = torch.load("./notebooks/resnet_pretrain_embedded_imgs.pt")
+    embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
 
+    # hidden = decoder.init_hidden(64)
     for epoch in range(1, num_epochs+1):
-        encoder.train()
+        # encoder.train()
         decoder.train()
 
-        decoder.init_hidden(batch_size=64)
+        # decoder.init_hidden(batch_size=64)
         for i_step in range(1, total_steps+1):
             # set models into training mode
-            
+            hidden = decoder.init_hidden(batch_size=64)
                     
             # Randomly sample a caption length, and sample indices with that length.
-            # indices = data_loader.dataset.get_func_train_indices()
-            indices = [(1,0)]
+            indices = data_loader.dataset.get_func_train_indices()
+            # indices = [(1,0)]
             # create separate lists for retrieving the image emebddings
             target_inds = torch.tensor([x[0] for x in indices]).long()
             distractor_inds = torch.tensor([x[1] for x in indices]).long()
@@ -172,28 +173,31 @@ def pretrain_speaker(
 
             # Zero the gradients (reset).
             decoder.zero_grad()
-            encoder.zero_grad()
+            # encoder.zero_grad()
             
             # Pass the inputs through the CNN-RNN model.
             # after retrieving the resnet embeddings
             target_features = torch.index_select(embedded_imgs, 0, target_inds)
-            # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
+            distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
 
-            print("Raw saved resnet features shape: ", target_features.shape)
-            target_features = encoder(targets)#encoder(target_features)
+            # print("Raw saved resnet features shape: ", target_features.shape)
+            # target_features = encoder(targets)#encoder(target_features)
             # print("Script encoder output: ", target_features)
-            distractor_features = encoder(distractors) #encoder(distractor_features)
+            # distractor_features = encoder(distractors) #encoder(distractor_features)
             # print("embedded resnet features shape: ", target_features.shape)
             # concat image features
-            both_images = torch.cat((target_features, distractor_features), dim=-1)
+            both_images = [target_features, distractor_features]#torch.cat((target_features, distractor_features), dim=-1)
             # print("Concat img features shape: ", both_images.shape)
-            outputs = decoder(both_images, target_captions)
+            outputs, hidden = decoder(both_images, target_captions, hidden)
             
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
 
             # Calculate the batch loss.
-            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1)) # 
+            # print("Outputs shape for loss: ", outputs.shape)
+            # print("transposed output: ", outputs.transpose(1,2).shape)
+            # print("Targets shape for loss: ", target_captions.shape)
+            loss = criterion(outputs.transpose(1,2), target_captions) # 
             # print("Loss: ", loss)
             # Backward pass.
             loss.backward()
@@ -223,35 +227,35 @@ def pretrain_speaker(
 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-byImage-prepend-1024dim-6000vocab-wResNet-%d.pkl' % epoch))
-            torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-byImage-prepend-1024dim-6000vocab-wResNet-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'CCE-decoder-noEnc-prepend-1024dim-4000vocab-rs1234-cont-%d.pkl' % epoch))
+            # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-noEnc-prepend-1024dim-4000vocab-wResNet-%d.pkl' % epoch))
 
             # compute validation loss
-            with torch.no_grad():
-                val_loss = validate_model(
-                    data_loader_val,
-                    encoder,
-                    decoder,
-                )     
-                # torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-earlystopping-%d-step-%d.pkl' % (epoch, i_step)))
-                # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-earlystoppiing-%d-step-%d.pkl' % (epoch, i_step)))
+            # with torch.no_grad():
+                # val_loss = validate_model(
+                #     data_loader_val,
+                #     encoder,
+                #     decoder,
+                # )     
+                # # torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-2imgs-earlystopping-%d-step-%d.pkl' % (epoch, i_step)))
+                # # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-2imgs-earlystoppiing-%d-step-%d.pkl' % (epoch, i_step)))
                 
-                val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i_step, total_steps, val_loss)
-                print(val_stats)
-                f.write(val_stats + '\n')
-                f.flush()   
+                # val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i_step, total_steps, val_loss)
+                # print(val_stats)
+                # f.write(val_stats + '\n')
+                # f.flush()   
                 
-                val_losses.append(val_loss)
-                val_steps.append(i_step)
-                # update stooper
-                early_stopper(val_loss)
-                # check if we want to break
-                if early_stopper.early_stop:
-                    # save the models
-                    torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-byImage-prepend-1024dim-earlystopping-6000vocab-wResNet-%d.pkl' % epoch))
-                    torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-byImage-prepend-1024dim-earlystopping-6000vocab-wResNet-%d.pkl' % epoch))
-                    print("Early stopping steps loop!")
-                    break
+                # val_losses.append(val_loss)
+                # val_steps.append(i_step)
+                # # update stooper
+                # early_stopper(val_loss)
+                # # check if we want to break
+                # if early_stopper.early_stop:
+                #     # save the models
+                #     torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-byImage-prepend-1024dim-earlystopping-6000vocab-wResNet-%d.pkl' % epoch))
+                #     torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-byImage-prepend-1024dim-earlystopping-6000vocab-wResNet-%d.pkl' % epoch))
+                #     print("Early stopping steps loop!")
+                #     break
 
         # save the training metrics
         df_out = pd.DataFrame({
@@ -265,7 +269,7 @@ def pretrain_speaker(
             "steps": val_steps,
             "val_losses": val_losses
         })
-        df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False)
+        # df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False)
 
         # also break the epochs 
         if early_stopper.early_stop:
