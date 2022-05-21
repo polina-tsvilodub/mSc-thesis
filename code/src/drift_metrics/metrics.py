@@ -26,6 +26,7 @@ class DriftMeter():
         """
         super(DriftMeter, self).__init__()
         self.structural_model = TransfoXLLMHeadModel.from_pretrained(structural_model)
+        self.structural_model.eval()
         self.tokenizer = TransfoXLTokenizer.from_pretrained(structural_model)
         self.decoder = semantic_decoder
         self.encoder = semantic_encoder
@@ -135,7 +136,7 @@ class DriftMeter():
         """
         # inputs_str = clean_sentence(caption)
         inputs = self.tokenizer(caption, return_tensors="pt")
-        model.eval()
+        print("Inputs: ", inputs)
         with torch.no_grad():
             # pass labels in order to get neg LL estimates of the inputs as the loss
             outputs = self.structural_model(**inputs, labels = inputs["input_ids"])

@@ -28,6 +28,7 @@ def play_game(
     f = open(log_file, 'w')
 
     csv_out = "functional_training_losses_token0_noEnc_vocab4000_metrics_"
+    csv_metrics = "functional_language_drift_metrics_train_"
 
     speaker_losses_structural = []
     speaker_losses_functional = []
@@ -38,6 +39,7 @@ def play_game(
     # TODO add metrics
     eval_steps = []
     semantic_drifts = []
+    structural_drifts = []
 
     lambda_s = 0.1
     torch.autograd.set_detect_anomaly(True)
@@ -202,16 +204,19 @@ def play_game(
             if i_step % print_every == 0:
                 print('\r' + stats)
                 # TODO double check
-                print("COMPUTING DRIFT METRICS")
                 # also compute the drift metrics during training to check the dynamics
                 for i in range(captions_pred.shape[0]): # iterate over sentences in batch
-                    print("I-th caption: ", captions_pred[i].unsqueeze(0).shape)
-                    print("I-th img unsqueezed: ", images1[i].unsqueeze(0).shape)
+                    # semantic drift under pretrained captioning model
                     semantic_drift = drift_meter.semantic_drift(captions_pred[i].unsqueeze(0), images1[i].unsqueeze(0))
-                    print("SEMANTIC DRIFT: ", semantic_drift)
                     eval_steps.append(i_step)
                     semantic_drifts.append(semantic_drift)
-
+                    # structural drift under a pretrained LM
+                    # decode caption to natural language for that
+                    # nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
+                    # print("NL caption: ", nl_caption)
+                    # structural_drift = drift_meter.structural_drift(nl_caption)
+                    # print("Structural DRIFT: ", structural_drift)
+                    # structural_drifts.append(structural_drift)
         # Save the weights.
         if epoch % save_every == 0:
             torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
@@ -229,7 +234,12 @@ def play_game(
             "accuracies": accuracies
         })
         df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
-
+        metrics_out = pd.DataFrame({
+            "steps": eval_steps,
+            # "structural_drift": strucutral_drifts,
+            "semantic_drifts": semantic_drifts,
+        })
+        metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
     # Close the training log file.
     f.close()
     pass
