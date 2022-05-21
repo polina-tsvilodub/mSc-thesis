@@ -27,8 +27,8 @@ class ListenerEncoderRNN(nn.Module):
         So, this function defines a hidden state with all zeroes
         The axes semantics are (num_layers, batch_size, hidden_dim)
         """
-        return (torch.zeros((1, batch_size, self.hidden_size), device=device), \
-                torch.zeros((1, batch_size, self.hidden_size), device=device))
+        return (torch.randn((1, batch_size, self.hidden_size), device=device), \
+                torch.randn((1, batch_size, self.hidden_size), device=device))
     
     def forward(self, captions):
         # initialize hidden layer
