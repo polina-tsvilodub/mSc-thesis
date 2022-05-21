@@ -62,12 +62,6 @@ def play_game(
 
             # Randomly sample a caption length, and sample indices with that length.
             indices_pairs = data_loader.dataset.get_func_train_indices()
-            # get the indices for retrieving the pretrained embeddings 
-            # target_inds = torch.tensor([x[0] for x in indices_pairs]).long()
-            # distractor_inds = torch.tensor([x[1] for x in indices_pairs]).long()
-            # get the embeddings
-            # target_features = torch.index_select(embedded_imgs, 0, target_inds).squeeze(1)
-            # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds).squeeze(1)
             
             # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
             new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
@@ -76,52 +70,35 @@ def play_game(
             # Obtain the target batch.
             images1, images2, target_features, distractor_features, captions = next(iter(data_loader))
             # create target-distractor image tuples
-            print("traget features retrieved from dataloader: ", target_features.shape)
-            # train_pairs = list(zip(images1, images2))
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             captions = captions.to(device)    
             
            
-            # targets_list = torch.tensor(targets_list).to(device)
-            # print("Tensor targets list: ", targets_list)
             ############################
             # Zero the gradients (reset).
-            # speaker_encoder.zero_grad()
             speaker_decoder.zero_grad()
             listener_encoder.zero_grad()
             listener_rnn.zero_grad()
             
             ###### Pass the images through the speaker model.
-            # project them with the linear layer
-            # target_speaker_features = speaker_encoder(target_features)
-            # distractor_speaker_features = speaker_encoder(distractor_features)
-            # print("S encoder grads : ", target_speaker_features.grad_fn.next_functions)
-            # concat image features AFTER projecting, target embedded first
-            # both_images = torch.cat((target_speaker_features, distractor_speaker_features), dim=-1)
             both_images = [target_features, distractor_features]
             # sample caption from speaker 
             # zip images and target indices such that we can input correct image into speaker
-            # preds_out = []
-            # log_probs_batch = []
             speaker_features_batch = []
             speaker_raw_output = []
             # get predicted caption and its log probability
-            # print("Max length for sampling: ", captions.shape[1])
             captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1)
             
             # transform predicted word indices to tensor
-            # preds_out = torch.stack(captions_pred, dim=-1)#.squeeze(-1)  
-            print(captions_pred[0])
-            print("Raw indices grad: ", captions_pred.grad_fn)  
-            print("Log probs grad: ", log_probs.grad_fn)
-            print("Raw out grad: ", raw_outputs.grad_fn)
+            # print("Raw indices grad: ", captions_pred.grad_fn)  
+            # print("Log probs grad: ", log_probs.grad_fn)
+            # print("Raw out grad: ", raw_outputs.grad_fn)
             #######
             # CREATE TARGET DIST RANDOM PAIRS FOR THE LISTENER
             targets_list = []
             features1_list = []
             features2_list = []
             target_indices_listener = np.random.choice([0,1], size=captions.shape[0]).tolist()
-            # print("Sampled target indices: ", target_indices_listener)
             for i, target in enumerate(target_indices_listener):
                 if target == 0:
                     features1_list.append(target_features[i])
@@ -134,13 +111,8 @@ def play_game(
                 targets_list.append(target)
             features1 = torch.stack(features1_list)
             features2 = torch.stack(features2_list)
-            # print("Optimized features1 lists: ", features1.shape)
-            # print("Optimized features2 lists: ", features2.shape)
             targets_list = torch.tensor(targets_list).to(device)
             #######    
-
-
-            print("Captions pred before L RNN; ", captions_pred.shape)
 
             # pass images and generated message form speaker through listener
             hiddens_scores, hidden = listener_rnn(captions_pred) #   preds_out
@@ -154,14 +126,11 @@ def play_game(
             # predicted_max_dots, predicted_inds = torch.max(predictions, dim = 1)
             ######
             # RL step
-    #         log_probs = torch.stack(log_probs_batch)
             # if target index and output index match, 1, else -1
             
             accuracy = torch.sum(torch.eq(targets_list, predictions).to(torch.int64))/predictions.shape[0]
-            print("Batch average accuracy: ", accuracy)
             accuracies.append(accuracy.item())
             rewards = [1 if x else -1 for x in torch.eq(targets_list, predictions).tolist()]
-            print("Rewards: ", rewards)
             # compute REINFORCE update
             rl_grads = update_policy.update_policy(rewards, log_probs, entropies) # check if log probs need to be stacked first
             # print("RL rgrad: ", rl_grads.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions)
@@ -179,16 +148,15 @@ def play_game(
             
             # combine structural loss and functional loss for the speaker # torch.stack(speaker_raw_output)
             loss_structural = criterion(raw_outputs.transpose(1,2), captions) 
-            print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
+            # print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
             speaker_loss =  lambda_s*loss_structural + rl_grads
-            print("Speaker LOSS grads ", speaker_loss.grad_fn )
-            print("Speaker LOSS grads ", speaker_loss.grad_fn.next_functions )
+            # print("Speaker LOSS grads ", speaker_loss.grad_fn )
+            # print("Speaker LOSS grads ", speaker_loss.grad_fn.next_functions )
             
             print("L_s: ", loss_structural, " L_f: ", rl_grads)
             
             # listener loss
             listener_loss = criterion(scores, targets_list)
-            print("L loss: ", listener_loss)
             
             # Backward pass.
             speaker_loss.backward(retain_graph=True)

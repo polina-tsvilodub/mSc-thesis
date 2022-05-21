@@ -134,9 +134,9 @@ print("VOCAB SIZE: ", vocab_size)
 # speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
 
-print("Model summaries:")
+# print("Model summaries:")
 
-print("Listener MLP requires grad: ", list(filter(lambda p: p.requires_grad, listener_encoder.parameters())))
+# print("Listener MLP requires grad: ", list(filter(lambda p: p.requires_grad, listener_encoder.parameters())))
 
 speaker_decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
 listener_rnn = ListenerEncoderRNN(LISTENER_EMBED_SIZE, HIDDEN_SIZE, vocab_size)

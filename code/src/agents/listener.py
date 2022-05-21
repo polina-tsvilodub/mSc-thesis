@@ -34,9 +34,7 @@ class ListenerEncoderRNN(nn.Module):
         # initialize hidden layer
         # check if this isn't reinitializing the hidden state in the middle of the sequence
 #         self.hidden = self.init_hidden(self.hidden_size)
-        print("captions shape in listener rnn : ", captions.shape)
         embeddings = self.embed(captions)
-        print("embeddings in listener rnn:", embeddings.shape)
         hiddens, self.hidden = self.lstm(embeddings)
 
         return hiddens, self.hidden[0] 
@@ -78,14 +76,11 @@ class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
         scores = torch.stack((dot_products_1, dot_products_2), dim=1) 
         scores_flat = scores.squeeze(-1).squeeze(-1)
         probs = softmax(scores_flat)
-        print("Listener action probs: ", probs.shape)
         # sample for training mode
         if self.training:
-            print("Success L train mode")
             cat_dist = torch.distributions.categorical.Categorical(probs)
             choices = cat_dist.sample()
             
         else:
             predicted_max_probs, choices = torch.max(probs, dim = 1)
-        print("Choices: ", choices)
         return choices, scores_flat        
