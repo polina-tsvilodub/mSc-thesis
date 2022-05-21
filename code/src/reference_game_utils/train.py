@@ -27,7 +27,7 @@ def play_game(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = "functional_training_losses_token0_noEnc_vocab4000_"
+    csv_out = "functional_training_losses_token0_noEnc_vocab4000_metrics_"
 
     speaker_losses_structural = []
     speaker_losses_functional = []
@@ -36,6 +36,8 @@ def play_game(
     steps = []
     accuracies = []
     # TODO add metrics
+    eval_steps = []
+    semantic_drifts = []
 
     lambda_s = 0.1
     torch.autograd.set_detect_anomaly(True)
@@ -50,6 +52,18 @@ def play_game(
     # Define the optimizer.
     speaker_optimizer = torch.optim.Adam(speaker_params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
     listener_optimizer = torch.optim.Adam(listener_params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
+
+    # init the drift metrics class
+    drift_meter = metrics.DriftMeter(
+        semantic_encoder="models/encoder-earlystoppiing-4_semantic-drift.pkl", 
+        semantic_decoder="models/decoder-earlystopping-4_semantic-drift.pkl", 
+        structural_model="transfo-xl-wt103",  
+        embed_size=1024, 
+        vis_embed_size=1024, 
+        hidden_size=512,
+        # TODO this will have to be retrained
+        vocab=6039#len(data_loader.dataset.vocab)
+    )
 
     for epoch in range(1, num_epochs+1):
         
@@ -188,16 +202,22 @@ def play_game(
             if i_step % print_every == 0:
                 print('\r' + stats)
                 # TODO double check
-
+                print("COMPUTING DRIFT METRICS")
                 # also compute the drift metrics during training to check the dynamics
-                # semantic_drift = metrics.semantic_drift(caption, image, visual_embed_size, embed_size, hidden_size, vocab_size)
-                
+                for i in range(captions_pred.shape[0]): # iterate over sentences in batch
+                    print("I-th caption: ", captions_pred[i].unsqueeze(0).shape)
+                    print("I-th img unsqueezed: ", images1[i].unsqueeze(0).shape)
+                    semantic_drift = drift_meter.semantic_drift(captions_pred[i].unsqueeze(0), images1[i].unsqueeze(0))
+                    print("SEMANTIC DRIFT: ", semantic_drift)
+                    eval_steps.append(i_step)
+                    semantic_drifts.append(semantic_drift)
+
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-noEnc-token0-vocab4000-%d.pkl' % epoch))
+            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
             # torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-noEnc-token0-vocab4000-%d.pkl' % epoch))
-            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-noEnc-token0-vocab4000-%d.pkl' % epoch))
+            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
+            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
             
         # save the training metrics
         df_out = pd.DataFrame({

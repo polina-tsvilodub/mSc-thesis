@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 from agents import resnet_encoder
 from . import image_captioner
+from transformers import TransfoXLLMHeadModel, TransfoXLTokenizer, TransfoXLConfig
+
 
 class DriftMeter():
     """
     A class instantiating models and functions for computing language drift.
     """
-    def __init__(self, semantic_encoder, semantic_decoder, structural_model, structural_tokenizer, embed_size, vis_embed_size, vocab):
+    def __init__(self, semantic_encoder, semantic_decoder, structural_model, embed_size, vis_embed_size, hidden_size, vocab):
         """
         Initialize the object holding all functions and models for 
         computing the language drift metrics. Importantly, the models are only loaded once.
@@ -23,13 +25,28 @@ class DriftMeter():
         vocab: length of vocab
         """
         super(DriftMeter, self).__init__()
-        self.structural_model = structural_model
-        self.tokenizer = structural_koenizer
-        self.semantic_decoder = semantic_decoder
-        self.semantic_encoder = semantic_encoder
+        self.structural_model = TransfoXLLMHeadModel.from_pretrained(structural_model)
+        self.tokenizer = TransfoXLTokenizer.from_pretrained(structural_model)
+        self.decoder = semantic_decoder
+        self.encoder = semantic_encoder
         self.embed_size = embed_size
+        self.hidden_size = hidden_size
         self.visual_embed_size = vis_embed_size
         self.vocab_len = vocab
+        # instantiate models
+        self.semantic_encoder = resnet_encoder.EncoderCNN(self.visual_embed_size)
+        self.semantic_decoder = image_captioner.ImageCaptioner(self.embed_size, self.hidden_size, self.vocab_len) # this is a 1-image conditioned one now (with prepenading of embedding)
+        self.semantic_encoder.load_state_dict(torch.load(self.encoder))
+        self.semantic_decoder.load_state_dict(torch.load(self.decoder))
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.semantic_encoder.to(device)
+        self.semantic_decoder.to(device)
+        # set to .eval()
+        self.semantic_encoder.eval()
+        self.semantic_decoder.eval()
+        # softmax for computing the probabilities over the scores
+        self.softmax = nn.Softmax(dim=-1)
+        
 
 
     # language drift metric (a)
@@ -81,7 +98,7 @@ class DriftMeter():
         return overlap_score
 
     # old metric
-    def semantic_drift(self, caption, image, visual_embed_size, embed_size, hidden_size, vocab_size):
+    def semantic_drift(self, caption, image):
         """
         P(caption|image) under image caption model pretrained on one image only.
         
@@ -94,26 +111,14 @@ class DriftMeter():
                 Tensor of conditional log probabilities measuring the semantic drift. 
         """
         # load pretrained models
-        encoder = resnet_encoder.EncoderCNN(visual_embed_size)
-        decoder = image_captioner.ImageCaptioner(embed_size, hidden_size, vocab_size) # this is a 1-image conditioned one now (with prepenading of embedding)
-        encoder.load_state_dict(torch.load("../models/encoder-earlystoppiing-4_semantic-drift.pkl"))
-        decoder.load_state_dict(torch.load("../models/decoder-earlystopping-4_semantic-drift.pkl"))
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        encoder.to(device)
-        decoder.to(device)
-        # set to .eval()
-        encoder.eval()
-        decoder.eval()
-        # softmax for computing the probabilities over the scores
-        softmax = nn.Softmax(dim=-1)
         sent_probs = []
         with torch.no_grad():   
             # embed image
-            features = encoder(image)
+            features = self.semantic_encoder(image)
             # pass image, embedded caption through lstm
-            scores = decoder(features, caption) # TODO which format does the caption have to have?
+            scores = self.semantic_decoder(features, caption) # TODO which format does the caption have to have?
             # retrieve log probs of the target tokens (probs at given indices) 
-            scores_prob = softmax(scores) 
+            scores_prob = self.softmax(scores) 
             # exclude START and END tokens
             sent_probs = []
             for num, cap in enumerate(caption.tolist()):
@@ -122,3 +127,19 @@ class DriftMeter():
             prob = torch.log(torch.stack(sent_probs)).sum(dim=1)
         return prob
 
+    def structural_drift(self, caption):
+        """
+        P(caption) under some pretrained language model. 
+        
+        Caption needs to be natural language str.
+        """
+        # inputs_str = clean_sentence(caption)
+        inputs = self.tokenizer(caption, return_tensors="pt")
+        model.eval()
+        with torch.no_grad():
+            # pass labels in order to get neg LL estimates of the inputs as the loss
+            outputs = self.structural_model(**inputs, labels = inputs["input_ids"])
+            neg_ll = outputs[0]
+        # compute sentence-level LL
+        sent_ll = -neg_ll.sum(-1)
+        return sent_ll
