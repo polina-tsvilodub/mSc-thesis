@@ -136,7 +136,6 @@ class DriftMeter():
         """
         # inputs_str = clean_sentence(caption)
         inputs = self.tokenizer(caption, return_tensors="pt")
-        print("Inputs: ", inputs)
         with torch.no_grad():
             # pass labels in order to get neg LL estimates of the inputs as the loss
             outputs = self.structural_model(**inputs, labels = inputs["input_ids"])

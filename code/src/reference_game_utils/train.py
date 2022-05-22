@@ -209,14 +209,13 @@ def play_game(
                     # semantic drift under pretrained captioning model
                     semantic_drift = drift_meter.semantic_drift(captions_pred[i].unsqueeze(0), images1[i].unsqueeze(0))
                     eval_steps.append(i_step)
-                    semantic_drifts.append(semantic_drift)
+                    semantic_drifts.append(semantic_drift.item())
                     # structural drift under a pretrained LM
                     # decode caption to natural language for that
-                    # nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
-                    # print("NL caption: ", nl_caption)
-                    # structural_drift = drift_meter.structural_drift(nl_caption)
-                    # print("Structural DRIFT: ", structural_drift)
-                    # structural_drifts.append(structural_drift)
+                    nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
+                    nl_caption = " ".join(nl_caption)
+                    structural_drift = drift_meter.structural_drift(nl_caption)
+                    structural_drifts.append(structural_drift.item())
         # Save the weights.
         if epoch % save_every == 0:
             torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
@@ -236,7 +235,7 @@ def play_game(
         df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
         metrics_out = pd.DataFrame({
             "steps": eval_steps,
-            # "structural_drift": strucutral_drifts,
+            "structural_drift": strucutral_drifts,
             "semantic_drifts": semantic_drifts,
         })
         metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
