@@ -117,7 +117,7 @@ class DriftMeter():
             # embed image
             features = self.semantic_encoder(image)
             # pass image, embedded caption through lstm
-            scores = self.semantic_decoder(features, caption) # TODO which format does the caption have to have?
+            scores = self.semantic_decoder(features, caption) 
             # retrieve log probs of the target tokens (probs at given indices) 
             scores_prob = self.softmax(scores) 
             # exclude START and END tokens

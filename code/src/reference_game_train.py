@@ -47,7 +47,7 @@ BATCH_SIZE = 64
 EPOCHS = 5#20 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/reference_game_token0_noEnc_1024dim_4000vocab_wFeatures_metrics_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/test-reference_game_token0_noEnc_1024dim_4000vocab_wFeatures_metrics_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -135,11 +135,15 @@ print("VOCAB SIZE: ", vocab_size)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
 listener_encoder.load_state_dict(torch.load("models/listener-encoder-noEnc-token0-vocab4000-1.pkl"))
 # print("Model summaries:")
+# print(listener_encoder.summary())
 
-# print("Listener MLP requires grad: ", list(filter(lambda p: p.requires_grad, listener_encoder.parameters())))
+print("Listener encoder requires grad: ", sum(p.numel() for p in listener_encoder.parameters() if p.requires_grad) )
+
 
 speaker_decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
 listener_rnn = ListenerEncoderRNN(LISTENER_EMBED_SIZE, HIDDEN_SIZE, vocab_size)
+print("Listener RNN requires grad: ", sum(p.numel() for p in listener_rnn.parameters() if p.requires_grad) )
+print("Speaker RNN requires grad: ", sum(p.numel() for p in speaker_decoder.parameters() if p.requires_grad) )
 
 speaker_decoder.load_state_dict(torch.load("models/speaker-decoder-noEnc-token0-vocab4000-1.pkl"))
 listener_rnn.load_state_dict(torch.load("models/listener-rnn-noEnc-token0-vocab4000-1.pkl"))
