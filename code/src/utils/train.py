@@ -126,8 +126,8 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/CCE-pretrain_noEnc_prepend_1024dim_losses_4000vocab_rs1234_cont_"
-    val_csv_out = "../../data/pretrain_noEnc_prepend_1024dim_val_losses_4000vocab_rs1234_cont_"
+    csv_out = "../../data/pretrain_noEnc_prepend_512dim_losses_4000vocab_rs1234_leon_DSfix_"
+    val_csv_out = "../../data/pretrain_noEnc_prepend_512dim_val_losses_4000vocab_rs1234_leon_DSfix_"
 
     speaker_losses=[]
     perplexities = []
@@ -180,14 +180,14 @@ def pretrain_speaker(
             # target_features = torch.index_select(embedded_imgs, 0, target_inds)
             # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
 
-            # print("Raw saved resnet features shape: ", target_features.shape)
+            print("Raw saved resnet features shape: ", target_features.shape)
             # target_features = encoder(targets)#encoder(target_features)
             # print("Script encoder output: ", target_features)
             # distractor_features = encoder(distractors) #encoder(distractor_features)
             # print("embedded resnet features shape: ", target_features.shape)
             # concat image features
-            both_images = [target_features, distractor_features]#torch.cat((target_features, distractor_features), dim=-1)
-            # print("Concat img features shape: ", both_images.shape)
+            both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1) # [target_features, distractor_features]
+            print("Concat img features shape in train: ", both_images.shape)
             outputs, hidden = decoder(both_images, target_captions, hidden)
             
             # The size of the vocabulary.
@@ -197,7 +197,7 @@ def pretrain_speaker(
             # print("Outputs shape for loss: ", outputs.shape)
             # print("transposed output: ", outputs.transpose(1,2).shape)
             # print("Targets shape for loss: ", target_captions.shape)
-            loss = criterion(outputs.transpose(1,2), target_captions) # 
+            loss = criterion(outputs.transpose(1,2), target_captions[:, 1:]) # 
             # print("Loss: ", loss)
             # Backward pass.
             loss.backward()

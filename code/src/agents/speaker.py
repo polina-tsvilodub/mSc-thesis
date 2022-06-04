@@ -31,7 +31,7 @@ class DecoderRNN(nn.Module):
         self.vocabulary_size = vocab_size
         self.visual_embed_size = visual_embed_size
         self.embed = nn.Embedding(self.vocabulary_size, self.embed_size) 
-        self.lstm = nn.LSTM(self.embed_size, self.hidden_size , self.num_layers, batch_first=True) # self.embed_size+
+        self.lstm = nn.LSTM(self.embed_size + 2*self.visual_embed_size, self.hidden_size , self.num_layers, batch_first=True) # self.embed_size+
         self.linear = nn.Linear(hidden_size, self.vocabulary_size)
         self.project = nn.Linear(2048, self.visual_embed_size)
         self.embed.weight.data.uniform_(-0.1, 0.1)
@@ -43,7 +43,7 @@ class DecoderRNN(nn.Module):
         self.batch_size = batch_size
         self.hidden = self.init_hidden(self.batch_size)
 
-    def init_hidden(self, batch_size):
+    def init_hidden(self, batch_size): # TODO try init hidden with image representations
         """ At the start of training, we need to initialize a hidden state;
         there will be none because the hidden state is formed based on previously seen data.
         So, this function defines a hidden state with all zeroes
@@ -68,15 +68,15 @@ class DecoderRNN(nn.Module):
             outputs: torch.tensor((batch_size, caption_length, embedding_dim))
                 Scores over vocabulary for each token in each caption.
         """
-        target_emb = self.project(features[0]).unsqueeze(1)
-        dist_emb = self.project(features[1]).unsqueeze(1)
-        img_features = torch.cat((target_emb, dist_emb), dim=-1) 
-        # print("Ft cat shape: ", img_features.shape)
+        # features of shape (batch_size, 2, 2048)
+        image_emb = self.project(features) # image_emb should have shape (batch_size, 2, 512)
+        # concatenate target and distractor embeddings
+        img_features = torch.cat((image_emb[:, 0, :], image_emb[:, 1, :]), dim=-1).unsqueeze(1) 
         embeddings = self.embed(captions)
-
+        # repeat image features such that they can be prepended to each token
+        img_features_reps = img_features.repeat(1, embeddings.shape[1]-1, 1)
         # PREpend the feature embedding as additional context as first token, cut off END token        
-        embeddings = torch.cat((img_features, embeddings[:, :-1,:]), dim=1) # features_reps, dim=-1
-        # print("Concat emb shape: ", embeddings.shape)
+        embeddings = torch.cat((img_features_reps, embeddings[:, :-1,:]), dim=-1) # features_reps, dim=-1
         hiddens, hidden_state = self.lstm(embeddings, prev_hidden)
         
         outputs = self.linear(hiddens)
@@ -109,7 +109,7 @@ class DecoderRNN(nn.Module):
         hidden = self.init_hidden(batch_size) # Get initial hidden state of the LSTM
         softmax = nn.Softmax(dim=-1)
         # create initial caption input: "START"
-        caption = torch.tensor([[0]]).repeat(batch_size, 1)
+        caption = torch.tensor([0, 0]).repeat(batch_size, 1) # two 0s since we cut off last token in forward step, so that we actually keep one
         # make initial forward step, get output of shape (batch_size, 1, vocab_size)
         init_hiddens = self.init_hidden(batch_size)
         ####

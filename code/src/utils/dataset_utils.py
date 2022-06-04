@@ -52,10 +52,21 @@ class COCOCaptionsDataset(Dataset):
         if mode == "train":
             self.image_dir = os.path.join(download_dir, "train2014") # download_dir needs to be data/train/ then 
             self.coco = COCO(file) # os.path.join(download_dir, file)
-            _ids = list(self.coco.anns.keys())
+            # _ids = list(self.coco.anns.keys())
+            # shuffle(_ids)
+            ####
+            # read imd2annID file. select N images, get all ann IDs => ids
+            with open("notebooks/imgID2annID.json", "r") as fp:
+                f = json.load(fp)
+            imgIDs4train = list(f.keys())[:30000]
+            _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             shuffle(_ids)
+            _ann_ids_flat = [i for lst in _ids for i in lst[0]]
+            self._img_ids_flat = [i[1] for i in _ids for x in i[0]]
+            
+            ####
             # retrieve a subset of images for pretraining
-            self.ids = torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+            self.ids = _ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             # set the image IDs for validation during early stopping to avoid overlapping images
             self.ids_val = torch.load("pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
@@ -66,17 +77,27 @@ class COCOCaptionsDataset(Dataset):
             self.caption_lengths_val = [len(token) for token in all_tokens_val] 
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
-            torch.save(torch.tensor(self.ids), "pretrain_img_IDs_2imgs_1024dim.pt")
+            torch.save(torch.tensor(self.ids), "pretrain_img_IDs_2imgs_512dim.pt")
             torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
 
         elif mode == "val":
+            with open("notebooks/imgID2annID_val.json", "r") as fp:
+                f = json.load(fp)
+            imgIDs4val = list(f.keys())
+            _ids = [(f[i], i) for i in imgIDs4val] # list of tuples of shape (annID_lst, imgID)
+            shuffle(_ids)
+            _ann_ids_flat = [i for lst in _ids for i in lst[0]]
+            self._img_ids_flat = [i[1] for i in _ids for x in i[0]]
+
             self.image_dir = os.path.join(download_dir, "val2014")
             self.coco = COCO(file) # os.path.join(download_dir, file)
-            self.ids = list(self.coco.anns.keys())#[:1000]
+            self.ids = _ann_ids_flat #list(self.coco.anns.keys())#[:1000]
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
             all_tokens = [tokenizer(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))] 
             self.caption_lengths = [len(token) for token in all_tokens]
+
+            
             
         else:
             # no annotations here 
@@ -124,12 +145,12 @@ class COCOCaptionsDataset(Dataset):
             target_image = Image.open(os.path.join(self.image_dir, target_path)).convert('RGB')
             target_image = self.transform(target_image)
             # Get the pre-extracted features
-            target_features = self.embedded_imgs[target_idx, :].squeeze(0) #torch.index_select(self.embedded_imgs, 0, target_idx).squeeze(1)
+            target_features = self.embedded_imgs[str(ann_id)]#[target_idx, :].squeeze(0) #torch.index_select(self.embedded_imgs, 0, target_idx).squeeze(1)
 
             distractor_image = Image.open(os.path.join(self.image_dir, distractor_path)).convert('RGB')
             distractor_image = self.transform(distractor_image)
             # Get pre-extracted features
-            distractor_features = self.embedded_imgs[distractor_idx, :].squeeze(0) # torch.index_select(self.embedded_imgs, 0, distractor_idx).squeeze(1)
+            distractor_features = self.embedded_imgs[str(dist_id)]#[distractor_idx, :].squeeze(0) # torch.index_select(self.embedded_imgs, 0, distractor_idx).squeeze(1)
 
             tokens = self.tokenizer(str(target_caption).lower())
             tokens_dist = self.tokenizer(str(distractor_caption).lower())
@@ -183,7 +204,10 @@ class COCOCaptionsDataset(Dataset):
         all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
 
         indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
-        possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t]
+        # retrieve image ids of sampled ids to make sure we don't get target distractor pairs
+        # consisiting of same images
+        imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
+        possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t and self._img_ids_flat[x] not in imgIDs_t]
         indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
         
         return list(zip(indices_t, indices_d))

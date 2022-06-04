@@ -80,7 +80,7 @@ def get_loader(transform,
                download_dir="../../../data/val/",
                vocab_from_pretrained=False,
                categorize_imgs=False,
-               embedded_imgs="COCO_train_ResNet_features_reshaped.pt",
+               embedded_imgs="COCO_train_ResNet_features_reshaped_dict.pt",
               ):
     """Returns the data loader.
     Args:

@@ -34,16 +34,16 @@ MAX_SEQUENCE_LENGTH = 15
 VOCAB_FILE = "../../data/vocab4000.pkl"
 
 # Model Dimensions
-EMBED_SIZE = 1024 # 1024 # dimensionality of word embeddings
+EMBED_SIZE = 512 # 1024 # dimensionality of word embeddings
 HIDDEN_SIZE = 512 # number of features in hidden state of the LSTM decoder
 VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 20 # number of training epochs
+EPOCHS = 8 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/CCE_pretraining_speaker_noEnc_prepend_1024dim_4000vocab_rs1234_cont_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_rs1234_leon_DSfix.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -59,7 +59,7 @@ domains_list = {
     "zips/train2014.zip"], 
 }
 # path to pre-saved image features file
-embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
+embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped_dict.pt")
 
 #########
 
