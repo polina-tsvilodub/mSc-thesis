@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from torchtext.data import get_tokenizer
 from PIL import Image
 from tqdm import tqdm
+import h5py
 
 # build a batch generator which takes ones caption out of the five at random
 # TODO add a bool for whether the imgs should be sorted into categories
@@ -186,6 +187,142 @@ class COCOCaptionsDataset(Dataset):
             # return original image and pre-processed image tensor
             return orig_image, image
         
+
+    def get_func_train_indices(self):
+        """
+        Simple POC function returning two lists on indices for the functional training. 
+        Returns a list of inidces for targets and a list f indices for distractors. 
+        Captions are of same lengths for targets and distractors (will be optimized).
+        
+        Returns:
+        -------
+            list: (int, int)
+                List of tuples of target and distractor indices, each for a single reference game iteration.
+        """
+        
+        sel_length_t = np.random.choice(self.caption_lengths)
+
+        all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
+
+        indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
+        # retrieve image ids of sampled ids to make sure we don't get target distractor pairs
+        # consisiting of same images
+        imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
+        possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t and self._img_ids_flat[x] not in imgIDs_t]
+        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
+        
+        return list(zip(indices_t, indices_d))
+
+class threeDshapes_Dataset(Dataset):
+    """
+    Dataset class for loading the dataset of images and captions from the 3dshapes dataset.
+    """
+    def __init__(
+        self,
+        file, 
+        download_dir, 
+        img_transform, 
+        text_transform, 
+        batch_size, 
+        mode, 
+        vocab_threshold, 
+        vocab_file, 
+        start_token, 
+        end_token,
+        unk_token,
+        pad_token, 
+        vocab_from_file, 
+        embedded_imgs,
+        vocab_from_pretrained=False,
+        max_sequence_length=0,
+        categorize_imgs=False,
+        ):
+
+        self.transform = img_transform
+        self.mode = mode # train or test or val
+        self.batch_size = batch_size
+        self.vocab = vocabulary.Vocabulary(vocab_threshold, vocab_file, 
+                                start_token, end_token, unk_token, 
+                                file, pad_token, vocab_from_file, vocab_from_pretrained) 
+        self.max_sequence_length = max_sequence_length
+        self.pad_token=pad_token
+        self.embedded_imgs=embedded_imgs
+        self.tokenizer = get_tokenizer("basic_english")
+
+        if mode == "train":
+            self.image_dir = os.path.join(download_dir, "3dshapes.h5") # download_dir needs to be data/train/ then 
+            self.images = h5py.File(self.image_dir, 'r')["images"] # os.path.join(download_dir, file)
+            with open("../../data/3dshapes_captions.json", "r") as fp:
+                self.labels = json.load(fp)
+            
+            imgIDs4train = list(self.labels.keys()) #np.random.choice(list(self.labels.keys()), 30000) # train split
+            _ids = [(self.labels[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
+            _anns_flat = [i for lst in _ids for i in np.random.choice(lst[0], 5)] # only select 5 random captions among 40 possible 
+            self._img_ids_flat = [i[1] for i in _ids for x in i[0][:5]]
+            self.ids = _anns_flat
+            print("IDS ", len(self.ids), self.ids[:10])
+            print("img IDs ", len(self._img_ids_flat), self._img_ids_flat[:10])
+
+            print('Obtaining caption lengths...')
+            tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
+            all_tokens = [tokenizer(str(self.ids[index])) for index in tqdm(np.arange(len(self.ids)))] 
+            self.caption_lengths = [len(token) for token in all_tokens]
+            
+            # print pretraining IDs for later separation from functional training
+            # save used indices to torch file
+            print("Type check before saving: ", type(imgIDs4train[0]))
+            torch.save(imgIDs4train, "pretrain_img_IDs_unique_3dshapes.pt")
+            torch.save(self._img_ids_flat, "pretrain_img_IDs_flat_3dshapes.pt")
+            torch.save(self.ids, "pretrain_anns_flat_3dshapes.pt")
+            
+        if mode == "val":
+            pass
+
+    def __len__(self):
+        # return len(self.ids)
+        # for extracting resnet features:
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        if self.mode != "test":
+            target_idx = idx[0]
+            distractor_idx = idx[1]
+            # just accessing images directly for resnet feature extraction
+            target_img = self.images[int(target_idx)]# self.images[int(self._img_ids_flat[target_idx])]
+            target_lbl = self.ids[target_idx]
+            
+            dist_img = self.images[int(distractor_idx)] #self.images[int(self._img_ids_flat[distractor_idx])]
+            dist_lbl = self.ids[distractor_idx]
+
+            target_img = np.asarray(target_img).astype('uint8')
+
+            dist_img = np.asarray(dist_img).astype('uint8')
+
+            target_img = self.transform(target_img)
+            dist_img = self.transform(dist_img)
+
+            tokens = self.tokenizer(str(target_lbl).lower())
+            tokens_dist = self.tokenizer(str(dist_lbl).lower())
+            # Convert caption to tensor of word ids, append start and end tokens.
+            target_caption = []
+            distractor_caption = []
+            target_caption.append(self.vocab(self.vocab.start_word))
+            distractor_caption.append(self.vocab(self.vocab.start_word))
+
+            # check if the sequence needs to be padded or truncated
+            if self.max_sequence_length != 0:
+                tokens = tokens[:self.max_sequence_length]
+                tokens_dist = tokens_dist[:self.max_sequence_length]
+
+            target_caption.extend([self.vocab(token) for token in tokens])
+            target_caption.append(self.vocab(self.vocab.end_word))
+            target_caption = torch.Tensor(target_caption).long()
+
+            distractor_caption.extend([self.vocab(token) for token in tokens_dist])
+            distractor_caption.append(self.vocab(self.vocab.end_word))
+            distractor_caption = torch.Tensor(distractor_caption).long()
+
+            return target_img, dist_img, target_caption
 
     def get_func_train_indices(self):
         """
