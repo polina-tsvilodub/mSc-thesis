@@ -50,6 +50,17 @@ class COCOCaptionsDataset(Dataset):
         self.pad_token=pad_token
         self.embedded_imgs=embedded_imgs
         self.tokenizer = get_tokenizer("basic_english")
+
+        # read categories2img
+        with open("../../../data/categories_to_image_IDs_train_filtered.json", "r") as fp:
+            f = json.load(fp)
+        self.categories2image = f    
+        self.category_ids = list(f.keys())
+        # read img2categories
+        with open("../../../data/imageIDs_to_categories_train_filtered.json", "r") as fp:
+            f = json.load(fp)
+        self.imgs2cats = f
+        
         # some distinctions below for Train and test mode
         if mode == "train":
             self.image_dir = os.path.join(download_dir, "train2014") # download_dir needs to be data/train/ then 
@@ -193,8 +204,8 @@ class COCOCaptionsDataset(Dataset):
         """
         Simple POC function returning two lists on indices for the functional training. 
         Returns a list of inidces for targets and a list f indices for distractors. 
-        Captions are of same lengths for targets and distractors (will be optimized).
-        
+        Caption lengths are the same for targets by sampling design, distractor captions are padded upon batch construction.
+
         Returns:
         -------
             list: (int, int)
@@ -213,6 +224,52 @@ class COCOCaptionsDataset(Dataset):
         indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
         
         return list(zip(indices_t, indices_d))
+
+    def get_func_similar_train_indices(self):
+        """
+        Simple POC function returning two lists on indices for the functional training. 
+        Returns a list of inidces for targets and a list f indices for distractors. 
+        Captions are of same lengths for targets and distractors (will be optimized).
+        
+        Returns:
+        -------
+            list: (int, int)
+                List of tuples of target and distractor indices, each for a single reference game iteration.
+        """
+
+        # TODO checks from construction of pairs w all captions per iamge need to be added
+      
+        # select at random a category of interest
+        # the idea is to have by-batch catrgorization
+        sel_category = np.random.choice(self.category_ids)
+        all_indices_cat = self.categories2image[sel_category]
+        # sample a batch, create tuples
+        indices_t = list(np.random.choice(all_indices_cat, size=self.batch_size))
+        possible_inds_dist = [x for x in all_indices_cat if x not in indices_t]
+        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
+        inds_tuples = list(zip(indices_t, indices_d))
+        # check that for each pair, the categories overlap between target and distractor matches my criteria
+        for tup in inds_tuples:
+            common_cats = list(set.intersection(set(self.imgs2cats[str(tup[0])]['categories']), set(self.imgs2cats[str(tup[1])]['categories'])))
+            print("common cats before while: ", common_cats)
+            print("Len common cats: ", len(common_cats))
+            print("target cats: ", set(self.imgs2cats[str(tup[0])]['categories']))
+            print("Len ", len(set(self.imgs2cats[str(tup[0])]['categories'])))
+            print("dist cats: ", set(self.imgs2cats[str(tup[1])]['categories']))
+            while len(common_cats) < 3 and len(common_cats) != len(self.imgs2cats[str(tup[0])]['categories']):
+                print("common cats in while: ", common_cats)
+                tup = tuple([tup[0], np.random.choice(possible_inds_dist, size=1).item()])
+                common_cats = list(set.intersection(set(self.imgs2cats[str(tup[0])]['categories']), set(self.imgs2cats[str(tup[1])]['categories'])))
+                # sample a new target dist pair
+                
+#         all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
+
+#         indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
+#         possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t]
+#         indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
+        
+        return inds_tuples#list(zip(indices_t, indices_d))
+
 
     def collate_distractors(self, batch):
         
