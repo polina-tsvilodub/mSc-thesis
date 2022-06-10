@@ -9,7 +9,7 @@ class DriftMeter():
     """
     A class instantiating models and functions for computing language drift.
     """
-    def __init__(self, semantic_encoder, semantic_decoder, structural_model, embed_size, vis_embed_size, hidden_size, vocab):
+    def __init__(self, structural_model, embed_size, vis_embed_size, hidden_size, vocab, semantic_encoder=None, semantic_decoder=None):
         """
         Initialize the object holding all functions and models for 
         computing the language drift metrics. Importantly, the models are only loaded once.
@@ -35,16 +35,18 @@ class DriftMeter():
         self.visual_embed_size = vis_embed_size
         self.vocab_len = vocab
         # instantiate models
-        self.semantic_encoder = resnet_encoder.EncoderCNN(self.visual_embed_size)
-        self.semantic_decoder = image_captioner.ImageCaptioner(self.embed_size, self.hidden_size, self.vocab_len) # this is a 1-image conditioned one now (with prepenading of embedding)
-        self.semantic_encoder.load_state_dict(torch.load(self.encoder))
-        self.semantic_decoder.load_state_dict(torch.load(self.decoder))
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.semantic_encoder.to(device)
-        self.semantic_decoder.to(device)
-        # set to .eval()
-        self.semantic_encoder.eval()
-        self.semantic_decoder.eval()
+        # ignore if they're not instantiated (e g when using in speaker pretraining)
+        if semantic_encoder is not None:
+            self.semantic_encoder = resnet_encoder.EncoderCNN(self.visual_embed_size)
+            self.semantic_decoder = image_captioner.ImageCaptioner(self.embed_size, self.hidden_size, self.vocab_len) # this is a 1-image conditioned one now (with prepenading of embedding)
+            self.semantic_encoder.load_state_dict(torch.load(self.encoder))
+            self.semantic_decoder.load_state_dict(torch.load(self.decoder))
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.semantic_encoder.to(device)
+            self.semantic_decoder.to(device)
+            # set to .eval()
+            self.semantic_encoder.eval()
+            self.semantic_decoder.eval()
         # softmax for computing the probabilities over the scores
         self.softmax = nn.Softmax(dim=-1)
         

@@ -10,6 +10,7 @@ from torchtext.data import get_tokenizer
 from PIL import Image
 from tqdm import tqdm
 import h5py
+from torch.nn.utils.rnn import pad_sequence
 
 # build a batch generator which takes ones caption out of the five at random
 # TODO add a bool for whether the imgs should be sorted into categories
@@ -79,7 +80,7 @@ class COCOCaptionsDataset(Dataset):
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
             torch.save(torch.tensor(self.ids), "pretrain_img_IDs_2imgs_512dim.pt")
-            torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
+            # torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
 
         elif mode == "val":
             with open("notebooks/imgID2annID_val.json", "r") as fp:
@@ -174,7 +175,7 @@ class COCOCaptionsDataset(Dataset):
             distractor_caption.append(self.vocab(self.vocab.end_word))
             distractor_caption = torch.Tensor(distractor_caption).long()
 
-            return target_image, distractor_image, target_features, distractor_features, target_caption # , distractor_caption
+            return target_image, distractor_image, target_features, distractor_features, target_caption, distractor_caption
 
         # obtain image if in test mode
         else:
@@ -212,6 +213,28 @@ class COCOCaptionsDataset(Dataset):
         indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
         
         return list(zip(indices_t, indices_d))
+
+    def collate_distractors(self, batch):
+        
+        target_image, distractor_image, target_features, distractor_features, target_caption, distractor_caps = [], [], [], [], [], []
+    
+        for (t_i, d_i, t_f, d_f, targ_c, dist) in batch:
+            target_image.append(t_i)
+            distractor_image.append(d_i)
+            target_features.append(t_f)
+            distractor_features.append(d_f)
+            target_caption.append(targ_c)
+            distractor_caps.append(dist)
+        
+        text_list = pad_sequence(distractor_caps, batch_first=True, padding_value=self.vocab(self.vocab.pad_word))
+        
+        target_image = torch.stack(target_image)
+        distractor_image = torch.stack(distractor_image)
+        target_features = torch.stack(target_features)
+        distractor_features = torch.stack(distractor_features)
+        target_caption = torch.stack(target_caption)
+
+        return target_image, distractor_image, target_features, distractor_features, target_caption, text_list
 
 class threeDshapes_Dataset(Dataset):
     """

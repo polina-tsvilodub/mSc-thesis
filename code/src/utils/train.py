@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from . import early_stopping
 import torch.nn as nn 
+from drift_metrics import metrics
 
 def validate_model(
     data_loader_val,
@@ -126,17 +127,32 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretrain_noEnc_prepend_512dim_losses_4000vocab_rs1234_leon_DSfix_"
-    val_csv_out = "../../data/pretrain_noEnc_prepend_512dim_val_losses_4000vocab_rs1234_leon_DSfix_"
-
+    csv_out = "../../data/pretrain_noEnc_prepend_512dim_losses_4000vocab_rs1234_wEmb_cont_"
+    val_csv_out = "../../data/pretrain_noEnc_prepend_512dim_val_losses_4000vocab_rs1234_wEmb_cont_"
+    csv_metrics = "pretrain_speaker_structural_drift_metrics_"
+    
     speaker_losses=[]
     perplexities = []
     steps = []
     val_losses, val_steps = [], []
+    eval_steps = []
+    structural_drifts_true = []
+    structural_drifts = []
     # init the early stopper
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
     embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
+    # init drift meter for tracking structural drift for reference
+    drift_meter = metrics.DriftMeter(
+        # semantic_encoder="models/encoder-earlystoppiing-4_semantic-drift.pkl", 
+        # semantic_decoder="models/decoder-earlystopping-4_semantic-drift.pkl", 
+        structural_model="transfo-xl-wt103",  
+        embed_size=512, 
+        vis_embed_size=512, 
+        hidden_size=512,
+        # TODO this will have to be retrained
+        vocab=len(data_loader.dataset.vocab)
+    )
 
     # hidden = decoder.init_hidden(64)
     for epoch in range(1, num_epochs+1):
@@ -162,7 +178,7 @@ def pretrain_speaker(
             data_loader.batch_sampler.sampler = new_sampler
             
             # Obtain the batch.
-            targets, distractors, target_features, distractor_features, target_captions = next(iter(data_loader))
+            targets, distractors, target_features, distractor_features, target_captions, distractor_captions = next(iter(data_loader))
             
             # Move batch of images and captions to GPU if CUDA is available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -180,14 +196,12 @@ def pretrain_speaker(
             # target_features = torch.index_select(embedded_imgs, 0, target_inds)
             # distractor_features = torch.index_select(embedded_imgs, 0, distractor_inds)
 
-            print("Raw saved resnet features shape: ", target_features.shape)
             # target_features = encoder(targets)#encoder(target_features)
             # print("Script encoder output: ", target_features)
             # distractor_features = encoder(distractors) #encoder(distractor_features)
             # print("embedded resnet features shape: ", target_features.shape)
             # concat image features
             both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1) # [target_features, distractor_features]
-            print("Concat img features shape in train: ", both_images.shape)
             outputs, hidden = decoder(both_images, target_captions, hidden)
             
             # The size of the vocabulary.
@@ -224,10 +238,24 @@ def pretrain_speaker(
             # Print training statistics (on different line).
             if i_step % print_every == 0:
                 print('\r' + stats)
+                # also compute structural drift, for potential comparison to reference game setting
+                for i in range(outputs.shape[0]): # iterate over sentences in batch
+                    # structural drift under a pretrained LM
+                    # decode caption to natural language for that
+                    eval_steps.append(i_step)
+                    nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
+                    nl_caption = " ".join(nl_caption)
+                    structural_drift = drift_meter.structural_drift(nl_caption)
+                    structural_drifts.append(structural_drift.item())
+                    # also compute this for ground truth caption, as a reference value
+                    nl_true_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in target_captions[i]]
+                    nl_true_caption = " ".join(nl_true_caption)
+                    structural_drift_true = drift_meter.structural_drift(nl_true_caption)
+                    structural_drifts_true.append(structural_drift_true.item())
 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'CCE-decoder-noEnc-prepend-1024dim-4000vocab-rs1234-cont-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-%d.pkl' % epoch))
             # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-noEnc-prepend-1024dim-4000vocab-wResNet-%d.pkl' % epoch))
 
             # compute validation loss
@@ -270,6 +298,13 @@ def pretrain_speaker(
             "val_losses": val_losses
         })
         # df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False)
+
+        metrics_out = pd.DataFrame({
+            "steps": eval_steps,
+            "structural_drift_true": strucutral_drifts_true,
+            "structural_drift_pred": structural_drifts,
+        })
+        metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
 
         # also break the epochs 
         if early_stopper.early_stop:
