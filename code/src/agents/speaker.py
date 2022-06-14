@@ -105,11 +105,11 @@ class DecoderRNN(nn.Module):
         raw_outputs = [] # for structural loss computation
         log_probs = []
         entropies = []
-        batch_size = inputs[0].shape[0] # batch_size is 1 at inference, inputs shape : (1, 1, embed_size)
+        batch_size = 64#inputs[0].shape[0] # batch_size is 1 at inference, inputs shape : (1, 1, embed_size)
         hidden = self.init_hidden(batch_size) # Get initial hidden state of the LSTM
         softmax = nn.Softmax(dim=-1)
         # create initial caption input: "START"
-        caption = torch.tensor([0, 0]).repeat(batch_size, 1) # two 0s since we cut off last token in forward step, so that we actually keep one
+        caption = torch.tensor([0, 0]).repeat(64, 1) # two 0s since we cut off last token in forward step, so that we actually keep one
         # make initial forward step, get output of shape (batch_size, 1, vocab_size)
         init_hiddens = self.init_hidden(batch_size)
         ####
@@ -126,17 +126,20 @@ class DecoderRNN(nn.Module):
         else:
             max_probs, cat_samples = torch.max(probs, dim = -1)
             log_p = torch.log(max_probs)
-
-        log_probs.append(log_p)
         output.append(cat_samples)
+        cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
+        # print("Cat samples ", cat_samples)
+        log_probs.append(log_p)
+        # output.append(cat_samples)
         word_emb = self.embed(cat_samples)
 
         # while True:
         for i in range(max_sequence_length):
-            
-            lstm_out, hidden_state = self.lstm(word_emb, hidden_state)
+            # print("CAT SAMPLES AT BEGINNING OF SAMPLING LOOP ", cat_samples)
+            out, hidden_state = self.forward(inputs, cat_samples, hidden_state)
+            # lstm_out, hidden_state = self.lstm(word_emb, hidden_state)
             # print("Self hidden after an iter of sampling loop: ", hidden_state )
-            out = self.linear(lstm_out)
+            # out = self.linear(lstm_out)
             
             # get and save probabilities and save raw outputs
             raw_outputs.extend(out)
@@ -153,10 +156,15 @@ class DecoderRNN(nn.Module):
                 # if in eval mode, take argmax
                 max_probs, cat_samples = torch.max(probs, dim = -1)
                 log_p = torch.log(max_probs)
-
+                entropy = -log_p * max_probs
+                entropies.append(entropy)
+            
+            output.append(cat_samples)
+            cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
+            # print("Cat samples ", cat_samples)
             log_probs.append(log_p)
             ####
-            output.append(cat_samples)
+            # output.append(cat_samples)
             # embed predicted tokens
             word_emb = self.embed(cat_samples)
             
@@ -173,6 +181,7 @@ class DecoderRNN(nn.Module):
         # include the END token
         end_inds = end_mask.add_(1).clamp_(max=output.size(-1)) # shape: (batch_size,)
         for pos, i in enumerate(end_inds):  
+            # print("end inds ", i)
             # zero out log Ps and entropies
             log_probs[pos, i:] = 0
             entropies[pos, i:] = 0

@@ -27,8 +27,8 @@ def play_game(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = "functional_training_losses_token0_noEnc_vocab4000_metrics_"
-    csv_metrics = "functional_language_drift_metrics_train_"
+    csv_out = "functional_training_losses_wPretrained_noEnc_vocab4000_metrics_cont_"
+    csv_metrics = "functional_training_wPretrained_language_drift_metrics_train_cont_"
 
     speaker_losses_structural = []
     speaker_losses_functional = []
@@ -36,7 +36,7 @@ def play_game(
     perplexities = []
     steps = []
     accuracies = []
-    # TODO add metrics
+
     eval_steps = []
     semantic_drifts = []
     structural_drifts = []
@@ -57,39 +57,40 @@ def play_game(
 
     # init the drift metrics class
     drift_meter = metrics.DriftMeter(
-        semantic_encoder="models/encoder-earlystoppiing-4_semantic-drift.pkl", 
-        semantic_decoder="models/decoder-earlystopping-4_semantic-drift.pkl", 
+        # semantic_encoder="models/encoder-earlystoppiing-4_semantic-drift.pkl", 
+        # semantic_decoder="models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-1.pkl", 
         structural_model="transfo-xl-wt103",  
-        embed_size=1024, 
+        embed_size=512, 
         vis_embed_size=1024, 
         hidden_size=512,
         # TODO this will have to be retrained
-        vocab=6039#len(data_loader.dataset.vocab)
+        vocab=4054#len(data_loader.dataset.vocab)
     )
 
     for epoch in range(1, num_epochs+1):
         
         for i_step in range(1, total_steps+1):
             # set mode of the models
-            speaker_decoder.train()
+            speaker_decoder.eval()
             # speaker_encoder.train()
             listener_encoder.train()
             listener_rnn.train()
 
             # Randomly sample a caption length, and sample indices with that length.
             indices_pairs = data_loader.dataset.get_func_train_indices()
+            # print("inds ", indices_pairs)
             
             # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
             new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
             
             data_loader.batch_sampler.sampler = new_sampler_pairs
             # Obtain the target batch.
-            images1, images2, target_features, distractor_features, captions = next(iter(data_loader))
+            images1, images2, target_features, distractor_features, captions, dist_captions = next(iter(data_loader))
             # create target-distractor image tuples
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             captions = captions.to(device)    
             
-           
+            print("Captions RAW ", captions)
             ############################
             # Zero the gradients (reset).
             speaker_decoder.zero_grad()
@@ -97,14 +98,14 @@ def play_game(
             listener_rnn.zero_grad()
             
             ###### Pass the images through the speaker model.
-            both_images = [target_features, distractor_features]
+            both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1)
             # sample caption from speaker 
             # zip images and target indices such that we can input correct image into speaker
             speaker_features_batch = []
             speaker_raw_output = []
             # get predicted caption and its log probability
             captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1)
-            
+            print("Captions pred ", captions_pred)
             # transform predicted word indices to tensor
             # print("Raw indices grad: ", captions_pred.grad_fn)  
             # print("Log probs grad: ", log_probs.grad_fn)
@@ -131,15 +132,13 @@ def play_game(
             #######    
 
             # pass images and generated message form speaker through listener
+            # print("captions_pred ", captions_pred)
             hiddens_scores, hidden = listener_rnn(captions_pred) #   preds_out
             # TODO check if these should be tuples or separate img1, img2 lists for using pre-extracted features
-            predictions, scores = listener_encoder(features1, features2, hidden.squeeze(0)) # train_pairs
-            # print("Listener encoder grads:", predictions.grad_fn.next_functions)
-            # print("Listener encoder grads:", predictions.grad_fn.next_functions[0][0].next_functions)
-            # print("Listener encoder grads:", predictions.grad_fn.next_functions[0][0].next_functions[0][0])
-            # print("Listener encoder grads:", predictions.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0])
-            # retrieve the index of the larger dot product
-            # predicted_max_dots, predicted_inds = torch.max(predictions, dim = 1)
+            features = torch.cat((features1.unsqueeze(1), features2.unsqueeze(1)), dim=1)
+            # print("CONCAT FEATURES FOR LISTENER BEFORE PASSING INTO ENCODER ", features.shape)
+            predictions, scores = listener_encoder(features, hidden.squeeze(0)) # train_pairs
+        
             ######
             # RL step
             # if target index and output index match, 1, else -1
@@ -163,7 +162,7 @@ def play_game(
             # (last implemented just like for pretraining), this is the structural loss component
             
             # combine structural loss and functional loss for the speaker # torch.stack(speaker_raw_output)
-            loss_structural = criterion(raw_outputs.transpose(1,2), captions) 
+            loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, :]) 
             # print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
             speaker_loss =  lambda_s*loss_structural + rl_grads
             # print("Speaker LOSS grads ", speaker_loss.grad_fn )
@@ -207,9 +206,9 @@ def play_game(
                 # also compute the drift metrics during training to check the dynamics
                 for i in range(captions_pred.shape[0]): # iterate over sentences in batch
                     # semantic drift under pretrained captioning model
-                    semantic_drift = drift_meter.semantic_drift(captions_pred[i].unsqueeze(0), images1[i].unsqueeze(0))
+                    # semantic_drift = drift_meter.semantic_drift(captions_pred[i].unsqueeze(0), images1[i].unsqueeze(0))
                     eval_steps.append(i_step)
-                    semantic_drifts.append(semantic_drift.item())
+                    # semantic_drifts.append(semantic_drift.item())
                     # structural drift under a pretrained LM
                     # decode caption to natural language for that
                     nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
@@ -218,10 +217,10 @@ def play_game(
                     structural_drifts.append(structural_drift.item())
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
+            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-wPretrained-vocab4000-metrics-cont-%d.pkl' % epoch))
             # torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
-            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-noEnc-token0-vocab4000-metrics-%d.pkl' % epoch))
+            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-wPretrained-vocab4000-metrics-cont-%d.pkl' % epoch))
+            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-wPretrained-vocab4000-metrics-cont-%d.pkl' % epoch))
             
         # save the training metrics
         df_out = pd.DataFrame({
@@ -235,8 +234,8 @@ def play_game(
         df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
         metrics_out = pd.DataFrame({
             "steps": eval_steps,
-            "structural_drift": strucutral_drifts,
-            "semantic_drifts": semantic_drifts,
+            "structural_drift": structural_drifts,
+            # "semantic_drifts": semantic_drifts,
         })
         metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
     # Close the training log file.

@@ -38,16 +38,16 @@ MAX_SEQUENCE_LENGTH = 15
 VOCAB_FILE = "../../data/vocab4000.pkl"
 
 # Model Dimensions
-EMBED_SIZE = 1024 # dimensionality of word embeddings
+EMBED_SIZE = 512 # dimensionality of word embeddings
 HIDDEN_SIZE = 512 # number of features in hidden state of the LSTM decoder
 VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 LISTENER_EMBED_SIZE = 512
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 5#20 # number of training epochs
+EPOCHS = 1#20 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/test-reference_game_token0_noEnc_1024dim_4000vocab_wFeatures_metrics_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/reference_game_wPretrained_512dim_4000vocab_wFeatures_metrics_cont_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -64,7 +64,7 @@ domains_list = {
 }
 
 # path to pre-saved image features file
-embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
+embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped_dict.pt")
 #########
 
 print("Beginning speaker pretraining script...")
@@ -115,8 +115,8 @@ data_loader_val = get_loader(
     embedded_imgs=embedded_imgs,
 )
 # truncate the val split
-data_loader_val.dataset.ids = torch.load("pretrain_val_img_IDs_2imgs_main.pt").tolist()#data_loader_val.dataset.ids[:NUM_VAL_IMGS]
-data_loader_val.dataset.caption_lengths = data_loader_val.dataset.caption_lengths[:NUM_VAL_IMGS]
+# data_loader_val.dataset.ids = torch.load("pretrain_val_img_IDs_2imgs_main.pt").tolist()#data_loader_val.dataset.ids[:NUM_VAL_IMGS]
+# data_loader_val.dataset.caption_lengths = data_loader_val.dataset.caption_lengths[:NUM_VAL_IMGS]
 # save
 # torch.save(torch.tensor(data_loader_val.dataset.ids), "pretrain_val_img_IDs_2imgs_main.pt")
 
@@ -133,7 +133,7 @@ print("VOCAB SIZE: ", vocab_size)
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
 # speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
-listener_encoder.load_state_dict(torch.load("models/listener-encoder-noEnc-token0-vocab4000-1.pkl"))
+listener_encoder.load_state_dict(torch.load("models/listener-encoder-wPretrained-vocab4000-metrics-1.pkl"))
 # print("Model summaries:")
 # print(listener_encoder.summary())
 
@@ -145,8 +145,8 @@ listener_rnn = ListenerEncoderRNN(LISTENER_EMBED_SIZE, HIDDEN_SIZE, vocab_size)
 print("Listener RNN requires grad: ", sum(p.numel() for p in listener_rnn.parameters() if p.requires_grad) )
 print("Speaker RNN requires grad: ", sum(p.numel() for p in speaker_decoder.parameters() if p.requires_grad) )
 
-speaker_decoder.load_state_dict(torch.load("models/speaker-decoder-noEnc-token0-vocab4000-1.pkl"))
-listener_rnn.load_state_dict(torch.load("models/listener-rnn-noEnc-token0-vocab4000-1.pkl"))
+speaker_decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-1.pkl"))
+listener_rnn.load_state_dict(torch.load("models/listener-rnn-wPretrained-vocab4000-metrics-1.pkl"))
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # speaker_encoder.to(device)

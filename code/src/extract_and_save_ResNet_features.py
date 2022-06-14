@@ -60,7 +60,7 @@ def extract_and_save_resnet_features(
         features = resnet(targets)
         preprocessed_images.append(features)
         
-        if i % 1000 == 0 :
+        if i % 5000 == 0 :
             print("Saving at ", i)
             preprocessed_images_tensor = torch.stack(preprocessed_images)
             torch.save(preprocessed_images_tensor,  "3dshapes_all_ResNet_features_reshaped_" + str(i) + ".pt")

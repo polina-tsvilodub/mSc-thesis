@@ -40,10 +40,10 @@ VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 8 # number of training epochs
+EPOCHS = 7 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_rs1234_leon_DSfix.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_rs1234_leon_DSfix_wEmbs_cont.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -141,7 +141,7 @@ print("VOCAB SIZE: ", vocab_size)
 # print("LOADED ENCODER WEIGHTS!")
 # encoder.load_state_dict(torch.load("models/encoder-2imgs-1024dim-2000vocab-1.pkl"))
 decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
-# decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-1024dim-4000vocab-rs1234-2.pkl"))
+decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-1.pkl"))
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -152,7 +152,7 @@ decoder.to(device)
 criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
 # Specify the learnable parameters of the model.
-params = list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(decoder.project.parameters())
+params = list(decoder.embed.parameters()) + list(decoder.lstm.parameters()) + list(decoder.linear.parameters()) + list(decoder.project.parameters())
 
 # print("Encoder MLP params: ", list(encoder.embed.parameters()))
 # print("Encoder CNN params: ", list(old_encoder.embed.parameters()))

@@ -41,7 +41,7 @@ class ListenerEncoderRNN(nn.Module):
 
 class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
        
-    def forward(self, images1, images2, caption): 
+    def forward(self, images, caption): 
         """
         Performs forward pass through the listener ResNet 50 CNN.
         Computes the dot product between two images and the caption provided by the speaker.
@@ -62,15 +62,16 @@ class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
             
         """
         softmax = nn.Softmax(dim=-1)
-        # will be improved
-        features1 = self.embed(images1)
-        features2 = self.embed(images2)
+        # embed images received as tuple, (batch_size, 2, 2048)
+        features = self.embed(images)
+        features1 = features[:, 0, :]
+        features2 = features[:, 1, :]
         # compute dot product between images and caption
         # compute mean over words as sentence embedding representation
-        dot_products_1 = torch.bmm(features1.view(images1.size()[0], 1, features1.size()[1]),
-                                   caption.view(images1.size()[0], features1.size()[1], 1))
-        dot_products_2 = torch.bmm(features2.view(images2.size()[0], 1, features2.size()[1]),
-                                   caption.view(images2.size()[0], features2.size()[1], 1))
+        dot_products_1 = torch.bmm(features1.view(features1.size()[0], 1, features1.size()[1]),
+                                   caption.view(features1.size()[0], features1.size()[1], 1))
+        dot_products_2 = torch.bmm(features2.view(features2.size()[0], 1, features2.size()[1]),
+                                   caption.view(features2.size()[0], features2.size()[1], 1))
         # compose targets and distractors dot products
         # stack into pairs, assuming dim=0 is the batch dimension
         scores = torch.stack((dot_products_1, dot_products_2), dim=1) 

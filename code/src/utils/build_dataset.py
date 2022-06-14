@@ -245,7 +245,7 @@ def get_loader_3dshapes(transform,
         pad_token=pad_word,
         vocab_from_file=vocab_from_file,
         vocab_from_pretrained=vocab_from_pretrained,
-        max_sequence_length=15,
+        max_sequence_length=25,
         categorize_imgs=categorize_imgs,
         embedded_imgs=embedded_imgs,
     )

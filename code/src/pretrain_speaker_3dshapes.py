@@ -28,9 +28,9 @@ VOCAB_THRESHOLD = 25 # minimum word count threshold
 VOCAB_FROM_FILE = True # if True, load existing vocab file
 VOCAB_FROM_PRETRAINED = False
 # Fixed length allowed for any sequence
-MAX_SEQUENCE_LENGTH = 15
+MAX_SEQUENCE_LENGTH = 25
 # path / name of vocab file
-VOCAB_FILE = "../../data/vocab4000.pkl"
+VOCAB_FILE = "../../data/vocab3dshapes.pkl"
 
 # Model Dimensions
 EMBED_SIZE = 512 # 1024 # dimensionality of word embeddings
@@ -39,10 +39,10 @@ VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 3 # number of training epochs
+EPOCHS = 5 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/pretraining_speaker_3dshapes.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/pretraining_speaker_3dshapes_cont.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -58,7 +58,7 @@ DOWNLOAD_DIR_TRAIN = "../../data"
 #     "zips/train2014.zip"], 
 # }
 # path to pre-saved image features file
-embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped_dict.pt")
+embedded_imgs = torch.load("3dshapes_all_ResNet_features_reshaped_all_sq.pt")#torch.cat(( torch.load("3dshapes_all_ResNet_features_reshaped_23000_first.pt"), torch.load("3dshapes_all_ResNet_features_reshaped_240000_first.pt") ), dim = 0)
 
 #########
 
@@ -109,7 +109,7 @@ print("VOCAB SIZE: ", vocab_size)
 # Initialize the encoder and decoder.
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
 # encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
-encoder = ResNetPreprocessor()
+# encoder = ResNetPreprocessor()
 # print("State dict keys: ", torch.load_state_dict("models/encoder-2imgs-1.pkl").keys())
 # pretrained_dict = torch.load("models/encoder-2imgs-1.pkl")
 # encoder_dict = encoder.state_dict()
@@ -122,6 +122,7 @@ encoder = ResNetPreprocessor()
 # print("LOADED ENCODER WEIGHTS!")
 # encoder.load_state_dict(torch.load("models/encoder-2imgs-1024dim-2000vocab-1.pkl"))
 decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
+decoder.load_state_dict(torch.load("models/decoder-3dshapes-512dim-4000vocab-3.pkl"))
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -150,7 +151,7 @@ pretrain_speaker(
     total_steps=total_steps,
     data_loader=data_loader_train, 
     data_loader_val=data_loader_train, # TODO
-    encoder=encoder,
+    # encoder=encoder,
     decoder=decoder,
     params=params,
     criterion=criterion,

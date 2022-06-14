@@ -5,7 +5,7 @@ from collections import Counter
 from torchtext.data import get_tokenizer
 from pycocotools.coco import COCO
 import gensim
-
+import json
 
 class Vocabulary(object):
 
@@ -114,12 +114,24 @@ class Vocabulary(object):
         Loop over training captions and add all tokens to the vocabulary that meet or exceed the threshold.
         Used if vocab is built from data.
         """
-        coco = COCO(self.annotations_file)
+        with open("../../data/3dshapes_captions.json", "r") as fp:
+                labels = json.load(fp)
+            
+        
+        ids = [i for lst in labels.keys() for i in labels[lst]]
+        
         counter = Counter()
-        ids = coco.anns.keys()
         tokenizer = get_tokenizer("basic_english")
+#         ids = coco.anns.keys()
         for i, id in enumerate(ids):
-            caption = str(coco.anns[id]['caption'])
+#             caption = str(coco.anns[id]['caption'])
+            caption = str(id)
+        # coco = COCO(self.annotations_file)
+        # counter = Counter()
+        # ids = coco.anns.keys()
+        # 
+        # for i, id in enumerate(ids):
+        #     caption = str(coco.anns[id]['caption'])
             caption = caption.lower().strip()
             caption = re.sub(r"[^a-zA-Z.,!?]+", r" ", caption)
             tokens = tokenizer(caption) 
