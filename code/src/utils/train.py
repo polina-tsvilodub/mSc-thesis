@@ -127,17 +127,23 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/metrics-test-pretrain_3dshapes_512dim_losses_47vocab_rs1234_wEmb_cont_"
-    val_csv_out = "../../data/pretrain_3dshapes_512dim_val_losses_47vocab_cont"
-    csv_metrics = "metrics-test-pretrain_3dshapes_512dim_metrics_47vocab_wEmb_"
+    csv_out = "../../data/pretrain_3dshapes_512dim_losses_49vocab_rs1234_exh_"
+    val_csv_out = "../../data/pretrain_3dshapes_512dim_val_losses_49vocab_exh_"
+    csv_metrics = "pretrain_3dshapes_512dim_metrics_49vocab_exh_"
     
     speaker_losses=[]
     perplexities = []
+    image_similarities = []
     steps = []
     val_losses, val_steps = [], []
     eval_steps = []
     structural_drifts_true = []
     structural_drifts = []
+    semantic_drifts = []
+    semantic_drifts_true = []
+    discrete_overlaps = []
+    cont_overlaps = []
+
     # init the early stopper
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
@@ -145,7 +151,7 @@ def pretrain_speaker(
     # init drift meter for tracking structural drift for reference
     drift_meter = metrics.DriftMeter(
         # semantic_encoder="models/encoder-earlystoppiing-4_semantic-drift.pkl", 
-        semantic_decoder="models/decoder-3dshapes-512dim-4000vocab-3.pkl", 
+        # semantic_decoder="models/decoder-3dshapes-512dim-47vocab-rs1234-wEmb-cont-5.pkl", 
         structural_model="transfo-xl-wt103",  
         embed_size=512, 
         vis_embed_size=512, 
@@ -178,7 +184,7 @@ def pretrain_speaker(
             data_loader.batch_sampler.sampler = new_sampler
             
             # Obtain the batch.
-            targets, distractors, target_features, distractor_features, target_captions = next(iter(data_loader)) # distractor_captions
+            targets, distractors, target_features, distractor_features, target_captions, distractor_captions = next(iter(data_loader)) 
             
             # Move batch of images and captions to GPU if CUDA is available.
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -208,9 +214,9 @@ def pretrain_speaker(
             vocab_size = len(data_loader.dataset.vocab)
 
             # Calculate the batch loss.
-            # print("Outputs shape for loss: ", outputs.shape)
-            # print("transposed output: ", outputs.transpose(1,2).shape)
-            # print("Targets shape for loss: ", target_captions.shape)
+            print("Outputs shape for loss: ", outputs.shape)
+            print("transposed output: ", outputs.transpose(1,2).shape)
+            print("Targets shape for loss: ", target_captions.shape)
             loss = criterion(outputs.transpose(1,2), target_captions[:, 1:]) # 
             # print("Loss: ", loss)
             # Backward pass.
@@ -236,8 +242,10 @@ def pretrain_speaker(
             f.flush()
             
             # Print training statistics (on different line).
-            if i_step % 1 == 0:
+            if i_step % 500 == 0:
                 print('\r' + stats)
+                decoder.eval()
+                init_hidden = decoder.init_hidden(1)
                 # also compute structural drift, for potential comparison to reference game setting
                 for i in range(outputs.shape[0]): # iterate over sentences in batch
                     # structural drift under a pretrained LM
@@ -246,28 +254,44 @@ def pretrain_speaker(
                     outputs_ind = softmax(outputs[i])
                     max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
 
-                    # need to be transformed argmaxxed indices
                     # TODO check masking tokens after end
-                    semantic_drift = drift_meter.semantic_drift(cat_samples, both_images[i])
-                    print("----- Semantic drift ---- ", semantic_drift)
+                    # semantic_drift = drift_meter.semantic_drift(cat_samples, both_images[i])
+                    # semantic_drifts.append(semantic_drift)
+                    # print("----- Semantic drift ---- ", semantic_drift)
+                    # for comparison, compute semantic drift of griund truth caption
+                    # semantic_drift_true = drift_meter.semantic_drift(target_captions[i], both_images[i])
+                    # semantic_drifts_true.append(semantic_drift_true)
+                    # print("----- Semantic drift ground truth ---- ", semantic_drift_true)
                     
-
                     nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in cat_samples]
                     nl_caption = " ".join(nl_caption)
                     structural_drift = drift_meter.structural_drift(nl_caption)
-                    structural_drifts.append(structural_drift.item())
+                    structural_drifts.append(structural_drift)
                     # also compute this for ground truth caption, as a reference value
                     # caption_ind = softmax(targets_captions[i])
                     nl_true_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in target_captions[i]]
                     nl_true_caption = " ".join(nl_true_caption)
                     structural_drift_true = drift_meter.structural_drift(nl_true_caption)
-                    structural_drifts_true.append(structural_drift_true.item())
+                    structural_drifts_true.append(structural_drift_true)
 
                     # TODO overlap based drift metrics
-
+                    # discrete_overlap = drift_meter.compute_discrete_overlap(cat_samples, target_captions[i], distractor_captions[i])
+                    # # print("Discrete overlap score ", discrete_overlap)
+                    # discrete_overlaps.append(discrete_overlap)
+                    # # TODO get embeddings of the captions for discrete overlap computation
+                    # with torch.no_grad():
+                    #     _ , prediction_embs = decoder.forward(both_images[i].unsqueeze(0), cat_samples.unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
+                    #     target_embs = hidden[0].detach() #decoder.embed(target_captions[i])
+                    #     _ , distractor_embs = decoder.forward(both_images[i].unsqueeze(0), distractor_captions[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
+                    # cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0], target_embs[:, i, :], distractor_embs[0])
+                    # # print("Continuous overlap ", cont_overlap)
+                    # cont_overlaps.append(cont_overlap)
+                    # compute image similarities
+                    # cos_sim_img = drift_meter.image_similarity(target_features, distractor_features)
+                    # image_similarities.append(cos_sim_img)
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'metrics-test-decoder-3dshapes-512dim-47vocab-rs1234-wEmb-cont-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-3dshapes-512dim-49vocab-rs1234-exh-%d.pkl' % epoch))
             # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-noEnc-prepend-1024dim-4000vocab-wResNet-%d.pkl' % epoch))
 
             # compute validation loss
@@ -315,6 +339,10 @@ def pretrain_speaker(
             "steps": eval_steps,
             "structural_drift_true": structural_drifts_true,
             "structural_drift_pred": structural_drifts,
+            # "semantic_drifts_true": semantic_drifts_true,
+            # "semantic_drifts_pred": semantic_drifts,      
+            # "discrete_overlaps": discrete_overlaps,
+            # "continuous_overlaps": cont_overlaps,
         })
         metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
 

@@ -114,12 +114,17 @@ class Vocabulary(object):
         Loop over training captions and add all tokens to the vocabulary that meet or exceed the threshold.
         Used if vocab is built from data.
         """
-        with open("../../data/3dshapes_captions.json", "r") as fp:
+        with open("../../data/3dshapes_captions_fixed.json", "r") as fp:
                 labels = json.load(fp)
+        with open("../../data/3dshapes_captions_short.json", "r") as fp:
+                labels_short = json.load(fp)        
             
         
         ids = [i for lst in labels.keys() for i in labels[lst]]
-        
+        ids_short = [i for lst in labels_short.keys() for i in labels_short[lst]]
+        ids.extend(ids_short)
+        print(type(ids))
+
         counter = Counter()
         tokenizer = get_tokenizer("basic_english")
 #         ids = coco.anns.keys()

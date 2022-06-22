@@ -44,10 +44,10 @@ VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 LISTENER_EMBED_SIZE = 512
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 1#20 # number of training epochs
+EPOCHS = 2#20 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/reference_game_wPretrained_512dim_4000vocab_wFeatures_metrics_cont_log.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/reference_game_wPretrained_512dim_4000vocab_wFeatures_metrics_full_ls02_orig_wSampling_log.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -133,7 +133,7 @@ print("VOCAB SIZE: ", vocab_size)
 # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
 # speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
 listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
-listener_encoder.load_state_dict(torch.load("models/listener-encoder-wPretrained-vocab4000-metrics-1.pkl"))
+# listener_encoder.load_state_dict(torch.load("models/listener-encoder-wPretrained-vocab4000-metrics-1.pkl"))
 # print("Model summaries:")
 # print(listener_encoder.summary())
 
@@ -145,8 +145,8 @@ listener_rnn = ListenerEncoderRNN(LISTENER_EMBED_SIZE, HIDDEN_SIZE, vocab_size)
 print("Listener RNN requires grad: ", sum(p.numel() for p in listener_rnn.parameters() if p.requires_grad) )
 print("Speaker RNN requires grad: ", sum(p.numel() for p in speaker_decoder.parameters() if p.requires_grad) )
 
-speaker_decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-1.pkl"))
-listener_rnn.load_state_dict(torch.load("models/listener-rnn-wPretrained-vocab4000-metrics-1.pkl"))
+speaker_decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl"))
+# listener_rnn.load_state_dict(torch.load("models/listener-rnn-wPretrained-vocab4000-metrics-1.pkl"))
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # speaker_encoder.to(device)

@@ -260,6 +260,7 @@ def get_loader_3dshapes(transform,
         data_loader = torch.utils.data.DataLoader(
             dataset=dataset, 
             num_workers=num_workers,
+            collate_fn=dataset.collate_distractors, 
             batch_sampler=torch.utils.data.sampler.BatchSampler(sampler=initial_sampler,
                                                                 batch_size=dataset.batch_size,
                                                                 drop_last=False))

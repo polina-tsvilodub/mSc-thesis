@@ -10,6 +10,7 @@ code/src/models/
 code/src/notebooks/models/
 code/src/notebooks/*.csv
 code/src/notebooks/*.pkl
+code/src/drift_metrics/torch_utils/
 writing/thesis/main.pdf
 writing/thesis/main-blx.bib
 *.aux

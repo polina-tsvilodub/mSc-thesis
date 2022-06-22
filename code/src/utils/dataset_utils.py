@@ -11,7 +11,6 @@ from PIL import Image
 from tqdm import tqdm
 import h5py
 from torch.nn.utils.rnn import pad_sequence
-import time 
 # build a batch generator which takes ones caption out of the five at random
 # TODO add a bool for whether the imgs should be sorted into categories
 # and if so, do that on the self.ids  
@@ -75,7 +74,7 @@ class COCOCaptionsDataset(Dataset):
             # read imd2annID file. select N images, get all ann IDs => ids
             with open("notebooks/imgID2annID.json", "r") as fp:
                 f = json.load(fp)
-            imgIDs4train = list(f.keys())[:30000]
+            imgIDs4train = list(f.keys())[30000:60000]
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             shuffle(_ids)
             _ann_ids_flat = [i for lst in _ids for i in lst[0]]
@@ -94,7 +93,7 @@ class COCOCaptionsDataset(Dataset):
             self.caption_lengths_val = [len(token) for token in all_tokens_val] 
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
-            torch.save(torch.tensor(self.ids), "pretrain_img_IDs_2imgs_512dim.pt")
+            torch.save(torch.tensor(self.ids), "ref-game_img_IDs_2imgs_512dim_full_metrics.pt")
             # torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
 
         elif mode == "val":
@@ -338,26 +337,41 @@ class threeDshapes_Dataset(Dataset):
             self.images = np.load(self.image_dir) # ["images"] # os.path.join(download_dir, file)
             with open("../../data/3dshapes_captions_fixed.json", "r") as fp:
                 self.labels = json.load(fp)
+            with open("../../data/3dshapes_captions_short.json", "r") as fp:
+                self.labels_short = json.load(fp)
+                
             
-            # imgIDs4train = np.random.choice(list(self.labels.keys()), 30000) # train split
-            # _ids = [(self.labels[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
-            # _anns_flat = [i for lst in _ids for i in np.random.choice(lst[0], 5)] # only select 5 random captions among 40 possible 
-            self._img_ids_flat = torch.load( "pretrain_img_IDs_flat_3dshapes.pt") #[i[1] for i in _ids for x in i[0][:5]]
-            self.ids = torch.load( "pretrain_anns_flat_3dshapes.pt") #_anns_flat
-            print("IDS ", len(self.ids), self.ids[:10])
-            print("img IDs ", len(self._img_ids_flat), self._img_ids_flat[:10])
+            imgIDs4train = torch.load("ref_game_imgIDs_unique_wShortCaps_3dshapes.pt") #np.random.choice(list(self.labels.keys()), 30000) # train split, torch.load("pretrain_img_IDs_unique_3dshapes_final_pretrain.pt") #
+            print("len of img ids: ", len(imgIDs4train))
+            _ids = [(self.labels[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
+            # _ids_short = [(self.labels_short[i], i) for i in imgIDs4train] 
+
+            # _anns_flat = [i for lst in _ids for i in np.random.choice(lst[0], 3)] # only select 5 random captions among 40 possible
+            # _anns_flat_short = [i for lst in _ids_short for i in np.random.choice(lst[0], 3)] # only select 5 random captions among 40 possible 
+            # self._img_ids_flat = [i[1] for i in _ids for x in i[0][:6]]
+            self._img_ids_flat = [i[1] for i in _ids for x in i[0][:5]]
+            # _unique_IDs = list(set(self._img_ids_flat))
+            _anns_flat = []
+            for i in imgIDs4train:
+                # short_caps = np.random.choice(self.labels_short[i], 3)
+                long_caps = np.random.choice(self.labels[i], 5) # 3
+                # _anns_flat.extend(short_caps)
+                _anns_flat.extend(long_caps)
+            self.ids = _anns_flat
+            print("IDS ", len(self.ids), self.ids[:15])
+            print("img IDs ", len(self._img_ids_flat), self._img_ids_flat[:15])
 
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
-            all_tokens = [tokenizer(str(self.ids[index])) for index in tqdm(np.arange(len(self.ids)))] 
+            all_tokens = [tokenizer(str(self.ids[index]).replace("-", "")) for index in tqdm(np.arange(len(self.ids)))] 
             self.caption_lengths = [len(token) for token in all_tokens]
             
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
             # print("Type check before saving: ", type(imgIDs4train[0]))
-            # torch.save(imgIDs4train, "pretrain_img_IDs_unique_3dshapes.pt")
-            torch.save(self._img_ids_flat, "pretrain_img_IDs_flat_3dshapes.pt")
-            torch.save(self.ids, "pretrain_anns_flat_3dshapes.pt")
+            # torch.save(imgIDs4train, "ref_game_img_IDs_unique_imgIDs4train_3dshapes.pt")
+            # torch.save(self._img_ids_flat, "pretrain_img_IDs_flat_3dshapes_short.pt")
+            # torch.save(self.ids, "pretrain_anns_flat_3dshapes_short.pt")
             
         if mode == "val":
             pass
@@ -372,33 +386,22 @@ class threeDshapes_Dataset(Dataset):
             target_idx = idx[0]
             distractor_idx = idx[1]
             # just accessing images directly for resnet feature extraction
-            t1 = time.perf_counter()
             target_img = self.images[int(self._img_ids_flat[target_idx])]
             target_lbl = self.ids[target_idx]
             
             dist_img = self.images[int(self._img_ids_flat[distractor_idx])] # self.images[int(distractor_idx)] #
             dist_lbl = self.ids[distractor_idx]
-            t2 = time.perf_counter()
-            # print("Retrieval ", t2-t1)
             target_img = np.asarray(target_img).astype('uint8')
 
             dist_img = np.asarray(dist_img).astype('uint8')
-            t1 = time.perf_counter()
             target_img = self.transform(target_img)
             dist_img = self.transform(dist_img)
-            t2 = time.perf_counter()
-            # print("Transform ", t2-t1)
-
-            t1 = time.perf_counter()
+            
             target_features = self.embedded_imgs[int(self._img_ids_flat[target_idx])]#.squeeze(0)
             distractor_features = self.embedded_imgs[int(self._img_ids_flat[distractor_idx])]#.squeeze(0)
-            t2 = time.perf_counter()
-            # print("Features retrieval ", t2-t1)
-
-            t1 = time.perf_counter()
             
-            tokens = self.tokenizer(str(target_lbl).lower())
-            tokens_dist = self.tokenizer(str(dist_lbl).lower())
+            tokens = self.tokenizer(str(target_lbl).lower().replace("-", ""))
+            tokens_dist = self.tokenizer(str(dist_lbl).lower().replace("-", ""))
             # Convert caption to tensor of word ids, append start and end tokens.
             target_caption = []
             distractor_caption = []
@@ -417,10 +420,8 @@ class threeDshapes_Dataset(Dataset):
             distractor_caption.extend([self.vocab(token) for token in tokens_dist])
             distractor_caption.append(self.vocab(self.vocab.end_word))
             distractor_caption = torch.Tensor(distractor_caption).long()
-            t2 = time.perf_counter()
-            # print("Captions construction retrieval ", t2-t1)
-
-            return target_img, dist_img, target_features, distractor_features, target_caption
+            
+            return target_img, dist_img, target_features, distractor_features, target_caption, distractor_caption
 
     def get_func_train_indices(self):
         """
@@ -448,6 +449,28 @@ class threeDshapes_Dataset(Dataset):
         indices_d = list(np.random.choice(list(checked_ind_d), size=self.batch_size))
         
         return list(zip(indices_t, indices_d))
+
+    def collate_distractors(self, batch):
+        
+        target_image, distractor_image, target_features, distractor_features, target_caption, distractor_caps = [], [], [], [], [], []
+    
+        for (t_i, d_i, t_f, d_f, targ_c, dist) in batch:
+            target_image.append(t_i)
+            distractor_image.append(d_i)
+            target_features.append(t_f)
+            distractor_features.append(d_f)
+            target_caption.append(targ_c)
+            distractor_caps.append(dist)
+        
+        text_list = pad_sequence(distractor_caps, batch_first=True, padding_value=self.vocab(self.vocab.pad_word))
+        
+        target_image = torch.stack(target_image)
+        distractor_image = torch.stack(distractor_image)
+        target_features = torch.stack(target_features)
+        distractor_features = torch.stack(distractor_features)
+        target_caption = torch.stack(target_caption)
+
+        return target_image, distractor_image, target_features, distractor_features, target_caption, text_list
 
 def _sort_images_by_category(download_dir, filename, is_train):
     """

@@ -115,7 +115,7 @@ class DecoderRNN(nn.Module):
         ####
         # outsource first step bc of image projection
         out, hidden_state = self.forward(inputs, caption, init_hiddens)
-        raw_outputs.extend(out)
+        raw_outputs.append(out) #.extend(out)
         probs = softmax(out)
         if self.training:
             cat_dist = torch.distributions.categorical.Categorical(probs)
@@ -133,16 +133,15 @@ class DecoderRNN(nn.Module):
         # output.append(cat_samples)
         word_emb = self.embed(cat_samples)
 
-        # while True:
-        for i in range(max_sequence_length):
+        for i in range(max_sequence_length-1):
             # print("CAT SAMPLES AT BEGINNING OF SAMPLING LOOP ", cat_samples)
             out, hidden_state = self.forward(inputs, cat_samples, hidden_state)
             # lstm_out, hidden_state = self.lstm(word_emb, hidden_state)
-            # print("Self hidden after an iter of sampling loop: ", hidden_state )
+            # print("Self out after an iter of sampling loop: ", out.shape )
             # out = self.linear(lstm_out)
             
             # get and save probabilities and save raw outputs
-            raw_outputs.extend(out)
+            raw_outputs.append(out)
             probs = softmax(out)
             ####
             if self.training:
@@ -168,7 +167,9 @@ class DecoderRNN(nn.Module):
             # embed predicted tokens
             word_emb = self.embed(cat_samples)
             
-
+        # print("Len raw outputs ", len(raw_outputs))
+        # print(raw_outputs[0].shape)
+        # print(raw_outputs[1].shape)
         output = torch.stack(output, dim=-1).squeeze(1)
         # stack
         log_probs = torch.stack(log_probs, dim=1).squeeze(-1)
@@ -186,6 +187,7 @@ class DecoderRNN(nn.Module):
             log_probs[pos, i:] = 0
             entropies[pos, i:] = 0
         ####
-    
-        raw_outputs = torch.stack(raw_outputs, dim=1).view(batch_size, -1, self.vocabulary_size)
+        # print('raw stacked outputs in sampling before applying view: ', torch.stack(raw_outputs, dim=1).shape)
+        raw_outputs = torch.stack(raw_outputs, dim=1).squeeze(2)  #view(batch_size, -1, self.vocabulary_size)
+        # print('raw outputs as received in training loop: ', raw_outputs.shape)
         return output, log_probs, raw_outputs, entropies
