@@ -27,8 +27,8 @@ def play_game(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = "functional_training_losses_wPretrainedFixed_3dshapes_ls02_"
-    csv_metrics = "functional_training_wPretrainedFixed_3dshapes_language_drift_metrics_ls02_"
+    csv_out = "functional_training_losses_COCO_ls01_mb_"
+    csv_metrics = "functional_training_COCO_language_drift_metrics_ls01_mb_"
     # csv_out = "functional_training_losses_wPretrained_coco_ls02_orig_wSampling_"
     # csv_metrics = "functional_training_metrics_wPretrained_coco_ls02_orig_wSampling_"
 
@@ -42,6 +42,7 @@ def play_game(
     image_similarities = []
     image_similarities_val = []
     kl_divs = []
+    mean_baselines = []
 
     eval_steps = []
     structural_drifts_true = []
@@ -52,17 +53,15 @@ def play_game(
     cont_overlaps = []
     epochs_out = []
 
-    lambda_s = 0.2
+
+    lambda_s = 0.1
     kl_coeff = 0.1
     # torch.autograd.set_detect_anomaly(True)
 
     # embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
     speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_decoder.project.parameters()) 
     listener_params = list(listener_rnn.lstm.parameters()) + list(listener_encoder.embed.parameters()) 
-    # print("Speaker decoder params: ", speaker_decoder.state_dict().keys())
-    # print("speaker encoder params:", speaker_encoder.state_dict().keys())
-    # print("Listener encoder params: ", listener_encoder.state_dict().keys())
-    # print("Listener RNN : ", listener_rnn.state_dict().keys())
+    
     # Define the optimizer.
     speaker_optimizer = torch.optim.Adam(speaker_params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
     listener_optimizer = torch.optim.Adam(listener_params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
@@ -74,8 +73,8 @@ def play_game(
     # init the drift metrics class
     drift_meter = metrics.DriftMeter(
         # semantic_decoder="models/decoder-3dshapes-512dim-47vocab-rs1234-wEmb-short-5.pkl",
-        semantic_decoder="models/decoder-3dshapes-512dim-49vocab-rs1234-exh-3.pkl", 
-        # semantic_decoder="models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl", 
+        # semantic_decoder="models/decoder-3dshapes-512dim-49vocab-rs1234-exh-3.pkl", 
+        semantic_decoder="models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl", 
         structural_model="transfo-xl-wt103",  
         embed_size=512, 
         vis_embed_size=512, 
@@ -174,11 +173,19 @@ def play_game(
             rewards = [1 if x else -1 for x in torch.eq(targets_list, predictions).tolist()]
             #####
             # mean baseline
-            # b = mean_baseline.get()
+            b = mean_baseline.get()
             # print("current Baseline before update: ", b)
             # print("rewards to be added to baseline comp: ", rewards)
-            # mean_baseline.update(rewards) # TODO check batch dims and mea computation sensibility
-            # rewards = rewards - b # TODO CHEEEECK 
+            mean_baseline.update(rewards) # TODO check batch dims and mea computation sensibility
+            # print("rewards before mean baseline sub ", rewards)
+            rewards = torch.tensor(rewards)
+            rewards = rewards - b # TODO CHEEEECK 
+            # print("rewards after mean baseline sub ", rewards)
+            try:
+                mean_baselines.append(b.mean().item())
+            except AttributeError:
+                mean_baselines.append(b)
+            # print("Mean baselines list: ", mean_baselines)
             ####
             # compute REINFORCE update
             rl_grads = update_policy.update_policy(rewards, log_probs, entropies) # check if log probs need to be stacked first
@@ -321,10 +328,10 @@ def play_game(
 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-vocab49-metrics-full-3dshapes_ls02_fixed-%d.pkl' % epoch))
+            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-vocab4000-coco_ls01_mb-%d.pkl' % epoch))
             # torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-vocab49-metrics-full-3dshapes_ls02_fixed-%d.pkl' % epoch))
-            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-vocab49-metrics-full-3dshapes_ls02_fixed-%d.pkl' % epoch))
+            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-vocab4000-coco_ls01_mb-%d.pkl' % epoch))
+            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-vocab4000-coco_ls01_mb-%d.pkl' % epoch))
             
         # save the training metrics
         df_out = pd.DataFrame({
@@ -336,6 +343,7 @@ def play_game(
             "perplexities": perplexities,
             "accuracies": accuracies,
             "image_similarities": image_similarities,
+            "mean_mean_baselines": mean_baselines,
             # "KL_divs": kl_divs,
         })
         df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
