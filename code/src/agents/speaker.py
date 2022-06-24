@@ -118,12 +118,14 @@ class DecoderRNN(nn.Module):
         raw_outputs.append(out) #.extend(out)
         probs = softmax(out)
         if self.training:
+            # print("Using pure sampling")
             cat_dist = torch.distributions.categorical.Categorical(probs)
             cat_samples = cat_dist.sample()
             entropy = cat_dist.entropy()
             entropies.append(entropy)
             log_p = cat_dist.log_prob(cat_samples)
         else:
+            # print("using greedy")
             max_probs, cat_samples = torch.max(probs, dim = -1)
             log_p = torch.log(max_probs)
         output.append(cat_samples)
@@ -131,7 +133,7 @@ class DecoderRNN(nn.Module):
         # print("Cat samples ", cat_samples)
         log_probs.append(log_p)
         # output.append(cat_samples)
-        word_emb = self.embed(cat_samples)
+        # word_emb = self.embed(cat_samples)
 
         for i in range(max_sequence_length-1):
             # print("CAT SAMPLES AT BEGINNING OF SAMPLING LOOP ", cat_samples)
@@ -165,7 +167,7 @@ class DecoderRNN(nn.Module):
             ####
             # output.append(cat_samples)
             # embed predicted tokens
-            word_emb = self.embed(cat_samples)
+            # word_emb = self.embed(cat_samples)
             
         # print("Len raw outputs ", len(raw_outputs))
         # print(raw_outputs[0].shape)

@@ -43,7 +43,7 @@ BATCH_SIZE = 64
 EPOCHS = 7 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_rs1234_leon_DSfix_wEmbs_cont.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_teacher_forcing_05.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -59,7 +59,7 @@ domains_list = {
     "zips/train2014.zip"], 
 }
 # path to pre-saved image features file
-embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped_dict.pt")
+embedded_imgs = torch.load("train_logs/COCO_train_ResNet_features_reshaped_dict.pt")
 
 #########
 
@@ -111,7 +111,7 @@ data_loader_val = get_loader(
     embedded_imgs=embedded_imgs,
 )
 # truncate the val split
-data_loader_val.dataset.ids = torch.load("pretrain_val_img_IDs_2imgs_main.pt").tolist()#data_loader_val.dataset.ids[:NUM_VAL_IMGS]
+data_loader_val.dataset.ids = torch.load("train_logs/pretrain_val_img_IDs_2imgs_main.pt").tolist()#data_loader_val.dataset.ids[:NUM_VAL_IMGS]
 data_loader_val.dataset.caption_lengths = data_loader_val.dataset.caption_lengths[:NUM_VAL_IMGS]
 # save
 # torch.save(torch.tensor(data_loader_val.dataset.ids), "pretrain_val_img_IDs_2imgs_main.pt")
@@ -141,7 +141,7 @@ print("VOCAB SIZE: ", vocab_size)
 # print("LOADED ENCODER WEIGHTS!")
 # encoder.load_state_dict(torch.load("models/encoder-2imgs-1024dim-2000vocab-1.pkl"))
 decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
-decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-1.pkl"))
+# decoder.load_state_dict(torch.load("models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-1.pkl"))
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

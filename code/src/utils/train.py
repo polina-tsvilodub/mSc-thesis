@@ -7,6 +7,7 @@ import pandas as pd
 from . import early_stopping
 import torch.nn as nn 
 from drift_metrics import metrics
+import random
 
 def validate_model(
     data_loader_val,
@@ -127,9 +128,9 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretrain_3dshapes_512dim_losses_49vocab_rs1234_exh_"
-    val_csv_out = "../../data/pretrain_3dshapes_512dim_val_losses_49vocab_exh_"
-    csv_metrics = "pretrain_3dshapes_512dim_metrics_49vocab_exh_"
+    csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_05_"
+    val_csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_05_"
+    csv_metrics = "pretrain_coco_512dim_teacher_forcing_05_"
     
     speaker_losses=[]
     perplexities = []
@@ -147,6 +148,9 @@ def pretrain_speaker(
     # init the early stopper
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
+    # teacher forcing schedule
+    use_teacher_forcing_rate = 0.5
+
     # embedded_imgs = torch.load("3dshapes_all_ResNet_features_reshaped_all.pt") #torch.cat(( torch.load("3dshapes_all_ResNet_features_reshaped_23000_first.pt"), torch.load("3dshapes_all_ResNet_features_reshaped_240000_first.pt") ), dim = 0) #torch.load("COCO_train_ResNet_features_reshaped.pt")
     # init drift meter for tracking structural drift for reference
     drift_meter = metrics.DriftMeter(
@@ -162,17 +166,14 @@ def pretrain_speaker(
     softmax = nn.Softmax(dim=-1)
     # hidden = decoder.init_hidden(64)
     for epoch in range(1, num_epochs+1):
-        # encoder.train()
-        decoder.train()
 
-        # decoder.init_hidden(batch_size=64)
         for i_step in range(1, total_steps+1):
+            decoder.train()
             # set models into training mode
-            hidden = decoder.init_hidden(batch_size=64)
+            hidden = decoder.init_hidden(batch_size=data_loader.batch_sampler.batch_size)
                     
             # Randomly sample a caption length, and sample indices with that length.
             indices = data_loader.dataset.get_func_train_indices()
-            # indices = [(1,0)]
             # create separate lists for retrieving the image emebddings
             # target_inds = torch.tensor([x[0] for x in indices]).long()
             # distractor_inds = torch.tensor([x[1] for x in indices]).long()
@@ -191,7 +192,7 @@ def pretrain_speaker(
             targets = targets.to(device)
             distractors = distractors.to(device)
             target_captions = target_captions.to(device)
-            # print("TARGET CAPTIONS shape: ", target_captions.shape)
+            print("TARGET CAPTIONS shape: ", target_captions.shape)
 
             # Zero the gradients (reset).
             decoder.zero_grad()
@@ -208,15 +209,33 @@ def pretrain_speaker(
             # print("embedded resnet features shape: ", target_features.shape)
             # concat image features
             both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1) # [target_features, distractor_features]
-            outputs, hidden = decoder(both_images, target_captions, hidden)
             
+            #### teacher forcing 
+            if random.random() < use_teacher_forcing_rate:
+                print("Using teacher forcing")
+                outputs, hidden = decoder(both_images, target_captions, hidden)
+            else:
+                print("using self-regression")
+                decoder.eval()
+                # print(f"doing self-regression for {target_captions.shape[1]} steps")
+                # start_caption = torch.tensor([0, 0]).repeat(data_loader.batch_sampler.batch_size, 1)
+                # for i in range(target_captions.shape[1] - 1):
+                #     tokens_outputs, hidden = decoder(both_images, start_caption, hidden)
+                #     print("SHAPE of LSTM out: ", outputs.shape)
+                #     pred_prob, pred_ind = torch.max(outputs, dim = -1)
+                #     # duplicate index for passing through the cutoff in the forward step
+                #     start_caption = torch.cat((pred_ind, pred_ind), dim = -1)
+                #     print("Duplicated predicted index: ", start_caption.shape)
+                max_seq_length = target_captions.shape[1]-1
+                captions_pred, log_probs, outputs, entropies = decoder.sample(both_images, max_sequence_length=max_seq_length)
+                # print("FINAL SHAPE of SAMPLED: ", outputs.shape)
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
 
             # Calculate the batch loss.
-            print("Outputs shape for loss: ", outputs.shape)
-            print("transposed output: ", outputs.transpose(1,2).shape)
-            print("Targets shape for loss: ", target_captions.shape)
+            # print("Outputs shape for loss: ", outputs.shape)
+            # print("transposed output: ", outputs.transpose(1,2).shape)
+            # print("Targets shape for loss: ", target_captions.shape)
             loss = criterion(outputs.transpose(1,2), target_captions[:, 1:]) # 
             # print("Loss: ", loss)
             # Backward pass.
@@ -291,9 +310,8 @@ def pretrain_speaker(
                     # image_similarities.append(cos_sim_img)
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-3dshapes-512dim-49vocab-rs1234-exh-%d.pkl' % epoch))
-            # torch.save(encoder.state_dict(), os.path.join('./models', 'encoder-noEnc-prepend-1024dim-4000vocab-wResNet-%d.pkl' % epoch))
-
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-coco-512dim-teacher_forcing_05-%d.pkl' % epoch))
+            
             # compute validation loss
             # with torch.no_grad():
                 # val_loss = validate_model(
