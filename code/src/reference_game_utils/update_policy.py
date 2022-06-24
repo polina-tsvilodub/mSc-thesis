@@ -46,9 +46,15 @@ class MeanBaseline():
         """
         Update current baseline based on new reward.
         """
+        if not torch.is_tensor(reward):
+            # print("transofrming rewards")
+            reward = torch.tensor(reward)
         # TODO: assume i do this element-wise (sentence wise), and then batch-average at end
-        self.mean_baseline += (reward - self.mean_baseline) / self.n_steps
+        # print(reward)
         self.n_steps += 1
+        self.mean_baseline += (reward - self.mean_baseline) / self.n_steps
+        
+        # print("--- N STEPS ---- ", self.n_steps)
         
     def get(self):
         """
