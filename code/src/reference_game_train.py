@@ -18,18 +18,26 @@ import random
 import sacred
 import argparse
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 ex = sacred.Experiment("coco_hyperparameter_search")
+usr = os.getenv("MONGO_INITDB_ROOT_USERNAME")
+pw = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
+db = os.getenv("MONGO_DATABASE")
+print(usr, pw, db)
 ex.observers.append(sacred.observers.MongoObserver(
-    url=f'mongodb://{os.environ.get("MONGO_INITDB_ROOT_USERNAME")}:{os.environ.get("MONGO_INITDB_ROOT_PASSWORD")}@localhost:27017/?authMechanism=SCRAM-SHA-1',
-    db_name=f"{os.ebviron.get("MONGO_DATABASE")}",
+    url=f'mongodb://{usr}:{pw}@localhost:27017/?authMechanism=SCRAM-SHA-1',
+    db_name=f"{db}",
 ))
 
 
-ex.observers.append(sacred.observers.FileStorageObserver("runs"))
+# ex.observers.append(sacred.observers.FileStorageObserver("runs"))
 
 # @ex.automain
-# @ex.capture
-def train_reference_game(
+@ex.capture
+def train_reference_game( 
     EPOCHS,
     EXPERIMENT,
     DATASET,
@@ -260,12 +268,18 @@ def train_reference_game(
 
     # check if I need a main function
     # check if I need to parse cmd args
+    for i in range(len(losses)):
+        ex.log_scalar("train_losses0", value=losses[i], step=i)
+        ex.log_scalar("train_metrics0", value=metrics[i], step=i)
     return losses, metrics
 
 @ex.main 
 def run(_config):
     losses, metrics = train_reference_game(**_config)
-    return losses, metrics
+    print(losses, metrics)
+    # ex.log_scalar("train_losses1", value=losses, step=[0, 1, 2])
+    # ex.log_scalar("train_metrics1", value=metrics, step = [0,1, 2])
+    # return losses, metrics
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
