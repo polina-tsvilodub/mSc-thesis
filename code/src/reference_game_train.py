@@ -19,10 +19,13 @@ import sacred
 import argparse
 
 ex = sacred.Experiment("coco_hyperparameter_search")
-# ex.observers.append(MongoObserver())
+ex.observers.append(sacred.observers.MongoObserver(
+    url=f'mongodb://{os.environ.get("MONGO_INITDB_ROOT_USERNAME")}:{os.environ.get("MONGO_INITDB_ROOT_PASSWORD")}@localhost:27017/?authMechanism=SCRAM-SHA-1',
+    db_name=f"{os.ebviron.get("MONGO_DATABASE")}",
+))
 
 
-# ex.observers.append(FileStorageObserver("runs"))
+ex.observers.append(sacred.observers.FileStorageObserver("runs"))
 
 # @ex.automain
 # @ex.capture
@@ -239,28 +242,30 @@ def train_reference_game(
     print("TOTAL STEPS:", total_steps)
 
     # training loop
-    # play_game(
-    #     log_file=LOG_FILE,
-    #     num_epochs=EPOCHS,
-    #     total_steps=total_steps,
-    #     data_loader=data_loader_train, 
-    #     data_loader_val=data_loader_val,
-    #     speaker_decoder=speaker_decoder,
-    #     listener_encoder=listener_encoder, 
-    #     listener_rnn=listener_rnn,
-    #     criterion=criterion,
-    #     weights_path=WEIGHTS_PATH,
-    #     print_every=PRINT_EVERY,
-    #     save_every=SAVE_EVERY,
-    # )
+    losses, metrics = play_game(
+        log_file=LOG_FILE,
+        num_epochs=EPOCHS,
+        total_steps=total_steps,
+        data_loader=data_loader_train, 
+        data_loader_val=data_loader_val,
+        speaker_decoder=speaker_decoder,
+        listener_encoder=listener_encoder, 
+        listener_rnn=listener_rnn,
+        criterion=criterion,
+        weights_path=WEIGHTS_PATH,
+        print_every=PRINT_EVERY,
+        save_every=SAVE_EVERY,
+    )
     # dump training stats and model 
 
     # check if I need a main function
     # check if I need to parse cmd args
+    return losses, metrics
 
 @ex.main 
 def run(_config):
-    train_reference_game(**_config)
+    losses, metrics = train_reference_game(**_config)
+    return losses, metrics
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
