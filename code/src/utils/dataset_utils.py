@@ -35,6 +35,9 @@ class COCOCaptionsDataset(Dataset):
             pad_token, 
             vocab_from_file, 
             embedded_imgs,
+            dataset_path,
+            num_imgs,
+            pairs,
             vocab_from_pretrained=False,
             max_sequence_length=0,
             categorize_imgs=False, # flag whether the images need to be sorted
@@ -74,7 +77,7 @@ class COCOCaptionsDataset(Dataset):
             # read imd2annID file. select N images, get all ann IDs => ids
             with open("notebooks/imgID2annID.json", "r") as fp:
                 f = json.load(fp)
-            imgIDs4train = list(f.keys())[30000:60000]
+            imgIDs4train = list(f.keys())[:30000] # 
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             shuffle(_ids)
             _ann_ids_flat = [i for lst in _ids for i in lst[0]]
@@ -82,9 +85,15 @@ class COCOCaptionsDataset(Dataset):
             
             ####
             # retrieve a subset of images for pretraining
-            self.ids = _ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+            if dataset_path is not None:
+                if num_imgs != 0:
+                    self.ids = torch.load(dataset_path).tolist()[:num_imgs]
+                else:
+                    self.ids = torch.load(dataset_path).tolist()
+            else:
+                self.ids = _ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             # set the image IDs for validation during early stopping to avoid overlapping images
-            self.ids_val = torch.load("pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
+            self.ids_val = torch.load("train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
             all_tokens = [tokenizer(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))] 
@@ -93,7 +102,9 @@ class COCOCaptionsDataset(Dataset):
             self.caption_lengths_val = [len(token) for token in all_tokens_val] 
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
-            torch.save(torch.tensor(self.ids), "ref-game_img_IDs_2imgs_512dim_full_metrics.pt")
+            # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_lf01.pt")
+            torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_30000_coco_teacher_forcing_scheduled_desc_05_byEp.pt")
+            
             # torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
 
         elif mode == "val":

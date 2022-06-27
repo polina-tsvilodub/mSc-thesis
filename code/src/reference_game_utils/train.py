@@ -9,13 +9,138 @@ import torch.nn as nn
 from drift_metrics import metrics
 from . import update_policy
 
+def validate_game_compute_metrics(
+    speaker_decoder,
+    drift_meter,
+    data_loader_val,
+    decoding_strategy,
+):
+    """
+    Helper for validating the speaker and computing all drift metrics while training
+    the agents in a reference game.
+
+    Arguments:
+    ---------
+
+    Returns:
+    -------
+
+    """
+    # TODO track at which main loop steps this is happening
+    val_running_loss = 0.0
+    val_running_ppl = 0.0
+    counter = 0
+
+    eval_steps = []
+    structural_drifts_true = []
+    structural_drifts = []
+    semantic_drifts = []
+    semantic_drifts_true = []
+    discrete_overlaps = []
+    cont_overlaps = []
+    epochs_out = []
+    val_ppl = []
+    val_losses = []
+    image_similarities_val = []
+
+    speaker_decoder.eval()
+
+    total_steps = math.ceil(len(data_loader_val.dataset.ids) / data_loader_val.batch_sampler.batch_size)
+
+    init_hidden = speaker_decoder.init_hidden(data_loader_val.batch_sampler.batch_size)
+
+    criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
+
+    for i in range(total_steps):
+        # compute validation loss and PPL
+        with torch.no_grad():
+            indices = data_loader_val.dataset.get_func_train_indices()
+            new_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
+            data_loader_val.batch_sampler.sampler = new_sampler
+
+            counter += 1
+            # obtain batch
+            images1, images2, target_features, distractor_features, captions, dist_captions = next(iter(data_loader_val))
+            # do forward pass
+            both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1)
+            # sample caption from speaker 
+            # get predicted caption and its log probability
+            captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1, decoding_strategy=decoding_strategy)
+            # compute val loss and PPL
+            loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) #+ kl_coeff * kl_div_batch
+            print("Loss structural batch ", loss_structural)
+            val_losses.append(loss_structural.item())
+            ppl = torch.exp(loss_structural).item()
+            print("ppl batch ", ppl)
+            val_running_ppl += ppl
+            val_ppl.append(ppl)
+            val_running_loss += loss_structural.item()        
+
+            eval_steps.append(i)
+            # structural drift under a pretrained LM
+            # decode caption to natural language for that
+            nl_captions = [[data_loader_val.dataset.vocab.idx2word[w.item()] for w in s] for s in captions_pred]
+            nl_captions = [" ".join(nl_caption) for nl_caption in nl_captions]
+            
+            structural_drift = drift_meter.structural_drift(nl_captions)
+            
+            structural_drifts.append(structural_drift)
+            # also compute this for ground truth caption, as a reference value
+            nl_true_captions = [[data_loader_val.dataset.vocab.idx2word[w.item()] for w in s] for s in captions]
+            nl_true_captions = [" ".join(nl_true_caption) for nl_true_caption in nl_true_captions]
+            structural_drift_true = drift_meter.structural_drift(nl_true_captions)
+            structural_drifts_true.append(structural_drift_true)
+            
+            ############
+            # structural drift under a pretrained LM
+            
+            # TODO check masking tokens after end
+            semantic_drift, _ = drift_meter.semantic_drift(captions_pred, both_images)
+            semantic_drifts.append(semantic_drift)
+            # print("----- Semantic drift ---- ", semantic_drift)
+            # for comparison, compute semantic drift of ground truth caption
+            semantic_drift_true, _ = drift_meter.semantic_drift(captions, both_images)
+            semantic_drifts_true.append(semantic_drift_true)
+            # print("----- Semantic drift ground truth ---- ", semantic_drift_true)
+
+            # overlap based drift metrics
+            discrete_overlap = drift_meter.compute_discrete_overlap(captions_pred, captions, dist_captions)
+            print("Discrete overlap score ", discrete_overlap)
+            discrete_overlaps.append(discrete_overlap)
+            
+            # get embeddings of the captions for discrete overlap computation
+            _ , prediction_embs = speaker_decoder.forward(both_images, captions_pred, init_hidden)#decoder.embed(cat_samples)
+            _, target_embs = speaker_decoder.forward(both_images, captions, init_hidden) #decoder.embed(target_captions[i])
+            _ , distractor_embs = speaker_decoder.forward(both_images, dist_captions, init_hidden)#decoder.embed(cat_samples)
+            cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0].squeeze(), target_embs[0].squeeze(), distractor_embs[0].squeeze())
+            print("Continuous overlap ", cont_overlap)
+            cont_overlaps.append(cont_overlap)
+
+            # also compute image similarities
+            img_similarity_val = drift_meter.image_similarity(target_features, distractor_features)
+            image_similarities_val.append(img_similarity_val)
+            epochs_out.append(epoch)
+    print("out shape of str drift list: ", len(structural_drifts), structural_drifts[0])
+    print("out shape of sem drift list: ", len(semantic_drifts), semantic_drifts[0])
+    print("out shape of img sim list: ", len(image_similarities_val), image_similarities_val[0])
+    print("out shape of cont ovelap list: ", len(cont_overlaps), cont_overlaps[0])
+    
+    
+    val_loss = val_running_loss / counter
+    val_ppl = val_running_ppl / counter
+    print("Final val loss ", val_loss)
+    print("Final val ppl ", val_ppl)
+    # TODO check if should write a file here or return means over the different batches            
+    # possibly return lists and extend the extant ones in the main loop
+    # check if I need a particular type of return for potential early stopping
+    return val_loss, val_ppl, epochs_out
+
 def play_game(
     log_file,
     num_epochs,
     total_steps,
     data_loader,
     data_loader_val, 
-    # speaker_encoder,
     speaker_decoder,
     listener_encoder, 
     listener_rnn,
@@ -23,12 +148,22 @@ def play_game(
     weights_path,
     print_every,
     save_every,
+    train_losses_file,
+    train_metrics_file,
+    val_losses_file,
+    val_metrics_file,
+    experiment,
+    lambda_s,
+    pretrained_decoder_file,
+    decoding_strategy,
+    mean_baseline,
+    entropy_weight,
 ):
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = "functional_training_losses_COCO_ls01_mb_"
-    csv_metrics = "functional_training_COCO_language_drift_metrics_ls01_mb_"
+    csv_out = train_losses_file #"functional_training_losses_COCO_lf01_"
+    csv_metrics = train_metrics_file #"functional_training_COCO_language_drift_metrics_lf01_"
     # csv_out = "functional_training_losses_wPretrained_coco_ls02_orig_wSampling_"
     # csv_metrics = "functional_training_metrics_wPretrained_coco_ls02_orig_wSampling_"
 
@@ -54,7 +189,8 @@ def play_game(
     epochs_out = []
 
 
-    lambda_s = 0.1
+    lambda_s = lambda_s
+    lambda_f = 1 - lambda_s
     kl_coeff = 0.1
     # torch.autograd.set_detect_anomaly(True)
 
@@ -74,7 +210,7 @@ def play_game(
     drift_meter = metrics.DriftMeter(
         # semantic_decoder="models/decoder-3dshapes-512dim-47vocab-rs1234-wEmb-short-5.pkl",
         # semantic_decoder="models/decoder-3dshapes-512dim-49vocab-rs1234-exh-3.pkl", 
-        semantic_decoder="models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl", 
+        semantic_decoder=pretrained_decoder_file,#"models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl", 
         structural_model="transfo-xl-wt103",  
         embed_size=512, 
         vis_embed_size=512, 
@@ -87,6 +223,7 @@ def play_game(
     # mean reward baseline variance stabilisation
     mean_baseline = update_policy.MeanBaseline()
 
+    
     for epoch in range(1, num_epochs+1):
         
         for i_step in range(1, total_steps+1):
@@ -122,19 +259,11 @@ def play_game(
             ###### Pass the images through the speaker model.
             both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1)
             # sample caption from speaker 
-            # zip images and target indices such that we can input correct image into speaker
-            speaker_features_batch = []
-            speaker_raw_output = []
             # get predicted caption and its log probability
-            captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1)
+            captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1, decoding_strategy=decoding_strategy)
             print("---- GROUND TRUTH CAPTIONS ---- ", update_policy.clean_sentence(captions, data_loader)[:2])
             print("---- PREDICTED CAPTIONS ---- ", update_policy.clean_sentence(captions_pred, data_loader)[:2])
             
-            # print("Captions pred ", captions_pred)
-            # transform predicted word indices to tensor
-            # print("Raw indices grad: ", captions_pred.grad_fn)  
-            # print("Log probs grad: ", log_probs.grad_fn)
-            # print("Raw out grad: ", raw_outputs.grad_fn)
             #######
             # CREATE TARGET DIST RANDOM PAIRS FOR THE LISTENER
             targets_list = []
@@ -173,22 +302,18 @@ def play_game(
             rewards = [1 if x else -1 for x in torch.eq(targets_list, predictions).tolist()]
             #####
             # mean baseline
-            b = mean_baseline.get()
-            # print("current Baseline before update: ", b)
-            # print("rewards to be added to baseline comp: ", rewards)
-            mean_baseline.update(rewards) # TODO check batch dims and mea computation sensibility
-            # print("rewards before mean baseline sub ", rewards)
-            rewards = torch.tensor(rewards)
-            rewards = rewards - b # TODO CHEEEECK 
-            # print("rewards after mean baseline sub ", rewards)
-            try:
-                mean_baselines.append(b.mean().item())
-            except AttributeError:
-                mean_baselines.append(b)
-            # print("Mean baselines list: ", mean_baselines)
+            if mean_baseline:
+                b = mean_baseline.get()
+                mean_baseline.update(rewards)
+                rewards = torch.tensor(rewards)
+                rewards = rewards - b 
+                try:
+                    mean_baselines.append(b.mean().item())
+                except AttributeError:
+                    mean_baselines.append(b)
             ####
             # compute REINFORCE update
-            rl_grads = update_policy.update_policy(rewards, log_probs, entropies) # check if log probs need to be stacked first
+            rl_grads = update_policy.update_policy(rewards, log_probs, entropies, entropy_weight=entropy_weight) # check if log probs need to be stacked first
             # print("RL rgrad: ", rl_grads.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions)
             # compute entropies for each datapoint, to be weighted into loss
             
@@ -230,7 +355,7 @@ def play_game(
             # print(captions.shape)
             loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) #+ kl_coeff * kl_div_batch
             # print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
-            speaker_loss =  lambda_s*loss_structural + rl_grads
+            speaker_loss =  lambda_s*loss_structural + lambda_f*rl_grads
             # print("Speaker LOSS grads ", speaker_loss.grad_fn )
             # print("Speaker LOSS grads ", speaker_loss.grad_fn.next_functions )
             
@@ -270,69 +395,79 @@ def play_game(
             f.flush()
             
             # Print training statistics (on different line).
-            if i_step % 500 == 0:
+            if i_step % 1 == 0:
                 print('\r' + stats)
                 # TODO double check
                 # also compute the drift metrics during training to check the dynamics
-                speaker_decoder.eval()
-                init_hidden = speaker_decoder.init_hidden(1)
-                for i in range(captions_pred.shape[0]): # iterate over sentences in batch
-                    # semantic drift under pretrained captioning model
-                    # decode caption to natural language for that
-                    # outputs_ind = softmax(captions_pred[i])
-                    # max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
-                    
-                    eval_steps.append(i_step)
-                    # structural drift under a pretrained LM
-                    # decode caption to natural language for that
-                    nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
-                    nl_caption = " ".join(nl_caption)
-                    structural_drift = drift_meter.structural_drift(nl_caption)
-                    structural_drifts.append(structural_drift)
-                    # also compute this for ground truth caption, as a reference value
-                    nl_true_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions[i]]
-                    nl_true_caption = " ".join(nl_true_caption)
-                    structural_drift_true = drift_meter.structural_drift(nl_true_caption)
-                    structural_drifts_true.append(structural_drift_true)
-                    
-                    ############
-                    # structural drift under a pretrained LM
-                    
-                    # TODO check masking tokens after end
-                    semantic_drift, _ = drift_meter.semantic_drift(captions_pred[i], both_images[i])
-                    semantic_drifts.append(semantic_drift)
-                    # print("----- Semantic drift ---- ", semantic_drift)
-                    # for comparison, compute semantic drift of ground truth caption
-                    semantic_drift_true, _ = drift_meter.semantic_drift(captions[i], both_images[i])
-                    semantic_drifts_true.append(semantic_drift_true)
-                    # print("----- Semantic drift ground truth ---- ", semantic_drift_true)
 
-                    # overlap based drift metrics
-                    discrete_overlap = drift_meter.compute_discrete_overlap(captions_pred[i], captions[i], dist_captions[i])
-                    # print("Discrete overlap score ", discrete_overlap)
-                    discrete_overlaps.append(discrete_overlap)
-                    # TODO get embeddings of the captions for discrete overlap computation
-                    with torch.no_grad():
-                        _ , prediction_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), captions_pred[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
-                        _, target_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), captions[i].unsqueeze(0), init_hidden) #decoder.embed(target_captions[i])
-                        _ , distractor_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), dist_captions[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
-                    cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0], target_embs[0], distractor_embs[0])
-                    # print("Continuous overlap ", cont_overlap)
-                    cont_overlaps.append(cont_overlap)
+                val_loss, val_ppl, val_epochs = validate_game_compute_metrics(
+                    speaker_decoder=speaker_decoder,
+                    drift_meter=drift_meter,
+                    data_loader_val=data_loader_val,
+                    decoding_strategy=decoding_strategy,
+                )
 
-                    # also compute image similarities
-                    img_similarity_val = drift_meter.image_similarity(target_features[i], distractor_features[i])
-                    image_similarities_val.append(img_similarity_val)
-                    epochs_out.append(epoch)
+                # speaker_decoder.eval()
+                # init_hidden = speaker_decoder.init_hidden(1)
+                # for i in range(captions_pred.shape[0]): # iterate over sentences in batch
+                #     # semantic drift under pretrained captioning model
+                #     # decode caption to natural language for that
+                #     # outputs_ind = softmax(captions_pred[i])
+                #     # max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
+                    
+                #     eval_steps.append(i_step)
+                #     # structural drift under a pretrained LM
+                #     # decode caption to natural language for that
+                #     nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
+                #     nl_caption = " ".join(nl_caption)
+                #     structural_drift = drift_meter.structural_drift(nl_caption)
+                #     structural_drifts.append(structural_drift)
+                #     # also compute this for ground truth caption, as a reference value
+                #     nl_true_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions[i]]
+                #     nl_true_caption = " ".join(nl_true_caption)
+                #     structural_drift_true = drift_meter.structural_drift(nl_true_caption)
+                #     structural_drifts_true.append(structural_drift_true)
+                    
+                #     ############
+                #     # structural drift under a pretrained LM
+                    
+                #     # TODO check masking tokens after end
+                #     semantic_drift, _ = drift_meter.semantic_drift(captions_pred[i], both_images[i])
+                #     semantic_drifts.append(semantic_drift)
+                #     # print("----- Semantic drift ---- ", semantic_drift)
+                #     # for comparison, compute semantic drift of ground truth caption
+                #     semantic_drift_true, _ = drift_meter.semantic_drift(captions[i], both_images[i])
+                #     semantic_drifts_true.append(semantic_drift_true)
+                #     # print("----- Semantic drift ground truth ---- ", semantic_drift_true)
+
+                #     # overlap based drift metrics
+                #     discrete_overlap = drift_meter.compute_discrete_overlap(captions_pred[i], captions[i], dist_captions[i])
+                #     # print("Discrete overlap score ", discrete_overlap)
+                #     discrete_overlaps.append(discrete_overlap)
+                #     # TODO get embeddings of the captions for discrete overlap computation
+                #     with torch.no_grad():
+                #         _ , prediction_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), captions_pred[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
+                #         _, target_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), captions[i].unsqueeze(0), init_hidden) #decoder.embed(target_captions[i])
+                #         _ , distractor_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), dist_captions[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
+                #     cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0], target_embs[0], distractor_embs[0])
+                #     # print("Continuous overlap ", cont_overlap)
+                #     cont_overlaps.append(cont_overlap)
+
+                #     # also compute image similarities
+                #     img_similarity_val = drift_meter.image_similarity(target_features[i], distractor_features[i])
+                #     image_similarities_val.append(img_similarity_val)
+                #     epochs_out.append(epoch)
                     ############
 
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(speaker_decoder.state_dict(), os.path.join('./models', 'speaker-decoder-vocab4000-coco_ls01_mb-%d.pkl' % epoch))
-            # torch.save(speaker_encoder.state_dict(), os.path.join('./models', 'speaker-encoder-singleImgs-token0-vocab6000-%d.pkl' % epoch))
-            torch.save(listener_rnn.state_dict(), os.path.join('./models', 'listener-rnn-vocab4000-coco_ls01_mb-%d.pkl' % epoch))
-            torch.save(listener_encoder.state_dict(), os.path.join('./models', 'listener-encoder-vocab4000-coco_ls01_mb-%d.pkl' % epoch))
-            
+            speaker_trained_file = os.path.join('./models', 'speaker_' + experiment + '_vocab4000_' + 'ls_' + decoding_strategy + "_decoding_")
+            torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
+            listener_rnn_trained_file = os.path.join('./models', 'listener_rnn_' + experiment + '_vocab4000_' + 'ls_' + decoding_strategy + "_decoding_")
+            listener_encoder_trained_file = os.path.join('./models', 'listener_encoder_' + experiment + '_vocab4000_' + 'ls_' + decoding_strategy + "_decoding_")
+            torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
+            torch.save(listener_encoder.state_dict(), listener_encoder_trained_file+'%d.pkl' % epoch )
+        
         # save the training metrics
         df_out = pd.DataFrame({
             "steps": steps,
@@ -362,4 +497,5 @@ def play_game(
         metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
     # Close the training log file.
     f.close()
-    pass
+
+    return speaker_losses, speaker_losses_structural, speaker_losses_functional, perplexities, listener_losses, accuracies, structural_drifts, structural_drifts_true, semantic_drifts, semantic_drifts_true, discrete_overlaps, cont_overlaps, image_similarities_val, epochs_out, loss_str_val, ppl_val, val_steps

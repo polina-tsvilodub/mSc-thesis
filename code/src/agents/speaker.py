@@ -82,7 +82,7 @@ class DecoderRNN(nn.Module):
         outputs = self.linear(hiddens)
         return outputs, hidden_state
     
-    def sample(self, inputs, max_sequence_length):
+    def sample(self, inputs, max_sequence_length, decoding_strategy):
         """
         Function for sampling a caption during functional (reference game) training.
         Implements greedy sampling. Sampling stops when END token is sampled or when max_sequence_length is reached.
@@ -94,6 +94,8 @@ class DecoderRNN(nn.Module):
                 pre-processed image tensor.
             max_sequence_length: int
                 Max length of sequence which the nodel should generate. 
+            decoding_strategy: str
+                Decoding algorithm (options are: pure, greedy, exp)
         Returns:
         ------
             output: list
@@ -117,17 +119,26 @@ class DecoderRNN(nn.Module):
         out, hidden_state = self.forward(inputs, caption, init_hiddens)
         raw_outputs.append(out) #.extend(out)
         probs = softmax(out)
-        if self.training:
-            # print("Using pure sampling")
+        if decoding_strategy == "pure":
             cat_dist = torch.distributions.categorical.Categorical(probs)
             cat_samples = cat_dist.sample()
             entropy = cat_dist.entropy()
             entropies.append(entropy)
             log_p = cat_dist.log_prob(cat_samples)
-        else:
+        elif decoding_strategy == "greedy":
             # print("using greedy")
             max_probs, cat_samples = torch.max(probs, dim = -1)
             log_p = torch.log(max_probs)
+        elif decoding_strategy == "exp":
+            probs = softmax(probs**5)
+            cat_dist = torch.distributions.categorical.Categorical(probs)
+            cat_samples = cat_dist.sample()
+            entropy = cat_dist.entropy()
+            entropies.append(entropy)
+            log_p = cat_dist.log_prob(cat_samples)
+        else: 
+            raise ValueError(f"Decoding strategy {decoding_strategy} is not implemented!")  
+
         output.append(cat_samples)
         cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
         # print("Cat samples ", cat_samples)
@@ -146,28 +157,31 @@ class DecoderRNN(nn.Module):
             raw_outputs.append(out)
             probs = softmax(out)
             ####
-            if self.training:
-                # try sampling from a categorical
+            if decoding_strategy == "pure":
                 cat_dist = torch.distributions.categorical.Categorical(probs)
                 cat_samples = cat_dist.sample()
                 entropy = cat_dist.entropy()
                 entropies.append(entropy)
                 log_p = cat_dist.log_prob(cat_samples)
-            else: 
+            elif decoding_strategy == "greedy": 
                 # if in eval mode, take argmax
                 max_probs, cat_samples = torch.max(probs, dim = -1)
                 log_p = torch.log(max_probs)
                 entropy = -log_p * max_probs
                 entropies.append(entropy)
-            
+            elif decoding_strategy == "exp":
+                probs = softmax(probs**5)
+                cat_dist = torch.distributions.categorical.Categorical(probs)
+                cat_samples = cat_dist.sample()
+                entropy = cat_dist.entropy()
+                entropies.append(entropy)
+                log_p = cat_dist.log_prob(cat_samples)
+            else:
+                raise ValueError(f"Decoding strategy {decoding_strategy} is not implemented!")
             output.append(cat_samples)
             cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
             # print("Cat samples ", cat_samples)
             log_probs.append(log_p)
-            ####
-            # output.append(cat_samples)
-            # embed predicted tokens
-            # word_emb = self.embed(cat_samples)
             
         # print("Len raw outputs ", len(raw_outputs))
         # print(raw_outputs[0].shape)

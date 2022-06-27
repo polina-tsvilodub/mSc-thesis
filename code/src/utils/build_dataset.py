@@ -39,34 +39,15 @@ def make_dataset(download_dir, filename, is_train):
     # load the records
     # instantiate dataset here now 
 
-    # instantiate get_loader 
-
-    # _, filenames, captions = load_records.load_captions_data(
-    #         download_dir=download_dir, 
-    #         filename=filename, # annotations filename
-    #         is_train=is_train,
-        # )
-    # load images   
-    # not sure if this works  
-    # print("Building image tfds") 
-    # img_dataset = tf.data.Dataset.from_tensor_slices(filenames).map(
-    #     preprocess_imgaes.load_image, num_parallel_calls=AUTOTUNE
-    # )
-    # # TODO
-    # # don't forget to sample 1 caption out of 5 
-    # # cap_dataset = tf.data.Dataset.from_tensor_slices(captions).map(
-    # #     TODO, num_parallel_calls=AUTOTUNE
-    # # )
-
-    # dataset = tf.data.Dataset.zip((img_dataset, cap_dataset))
-    # dataset = dataset.batch(BATCH_SIZE).shuffle(256).prefetch(AUTOTUNE)
-    # return dataset
 
 
 # Pass the list of images and the list of corresponding captions
 # train_dataset = make_dataset(list(train_data.keys()), list(train_data.values()))
 
 def get_loader(transform,
+               num_imgs=0,
+               pairs="random",
+               dataset_path=None,
                mode='val',
                batch_size=1,
                vocab_threshold=None,
@@ -121,6 +102,9 @@ def get_loader(transform,
     # TODO: alternatively, modify / sort the image IDS on the instantiated dataset.ids object 
     # COCO caption dataset.
     dataset = dataset_utils.COCOCaptionsDataset(
+        dataset_path=dataset_path,
+        pairs=pairs,
+        num_imgs=num_imgs,
         file=annotations_file,
         download_dir = download_dir, 
         img_transform=transform,

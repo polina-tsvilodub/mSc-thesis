@@ -54,7 +54,7 @@ class DriftMeter():
 
 
     # language drift metric (a)
-    def compute_discrete_overlap(self, generated_cap, target_cap, distractor_cap):
+    def compute_discrete_overlap(self, generated_caps, target_caps, distractor_caps):
         """
         Compute an overlap score over the generated caption with the two ground truth captions.
         This score is an attempt to capture language drift, while being agnostic towards compositional alternations.
@@ -67,20 +67,23 @@ class DriftMeter():
         distractor_cap:
             Ground truth caption for the distractor image.
         """
-        # target_score_list = [i == j for i, j in list(zip(generated_cap, target_cap))]
-        target_score_list = [i in target_cap for i in generated_cap]
-        # target_score_list = torch.eq(generated_cap, target_cap)
-        # distractor_score_list = [i == j for i, j in list(zip(generated_cap, distractor_cap))]
-        distractor_score_list = [i in distractor_cap for i in generated_cap]
-        # distractor_score_list = torch.eq(generated_cap, distractor_cap)
-        overlap_score = sum(target_score_list) - sum(distractor_score_list)
+        overlap_scores = []
+        for j in range(generated_caps.shape[0]):
+            # target_score_list = [i == j for i, j in list(zip(generated_cap, target_cap))]
+            target_score_list = [i in target_caps[j] for i in generated_caps[j]]
+            # target_score_list = torch.eq(generated_cap, target_cap)
+            # distractor_score_list = [i == j for i, j in list(zip(generated_cap, distractor_cap))]
+            distractor_score_list = [i in distractor_caps[j] for i in generated_caps[j]]
+            # distractor_score_list = torch.eq(generated_cap, distractor_cap)
+            overlap_score = sum(target_score_list) - sum(distractor_score_list)
+            overlap_scores.append(overlap_score)
         # overlap_score = target_score_list.sum(dim=1) - distractor_score_list.sum(dim=1) 
         
-        return overlap_score
+        return sum(overlap_scores)/len(overlap_scores)
 
     # metric (b)
 
-    def compute_cont_overlap(self, generated_cap, target_cap, distractor_cap):
+    def compute_cont_overlap(self, generated_caps, target_caps, distractor_caps):
         """
         Compute an overlap score over the generated caption with the two ground truth captions.
         This score is an attempt to capture language drift, while being agnostic towards compositional alternations.
@@ -97,13 +100,11 @@ class DriftMeter():
             overlap_scor (batch_size,)
                 tensor of cosine similarity scores by-caption.
         """
-        # ideally these should be last hidden state vectors out of the lstm for all the messages
-        target_dist = nn.functional.cosine_similarity(generated_cap, target_cap, dim=-1) # elementwise, then take average 
-        # print(target_dist)
-        distractor_dist = nn.functional.cosine_similarity(generated_cap, distractor_cap, dim=-1)
-        # print(distractor_dist)
-        overlap_score = target_dist.mean(dim=1) - distractor_dist.mean(dim=1)
-        return overlap_score.item()
+        target_dist = nn.functional.cosine_similarity(generated_caps, target_caps, dim=-1) # elementwise, then take average 
+        distractor_dist = nn.functional.cosine_similarity(generated_caps, distractor_caps, dim=-1)
+        # the mean computation makes it batch-level
+        overlap_score = target_dist.mean(dim=-1) - distractor_dist.mean(dim=-1)
+        return overlap_score.item() 
 
     # old metric
     def semantic_drift(self, caption, image):
@@ -165,7 +166,7 @@ class DriftMeter():
             neg_ll = outputs[0]
         # compute sentence-level LL
         sent_ll = -neg_ll.sum(-1)
-        return sent_ll.item()
+        return sent_ll
 
     def image_similarity(self, img1, img2):
         """
