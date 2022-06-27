@@ -14,6 +14,7 @@ def validate_game_compute_metrics(
     drift_meter,
     data_loader_val,
     decoding_strategy,
+    epoch,
 ):
     """
     Helper for validating the speaker and computing all drift metrics while training
@@ -68,10 +69,8 @@ def validate_game_compute_metrics(
             captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1, decoding_strategy=decoding_strategy)
             # compute val loss and PPL
             loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) #+ kl_coeff * kl_div_batch
-            print("Loss structural batch ", loss_structural)
             val_losses.append(loss_structural.item())
             ppl = torch.exp(loss_structural).item()
-            print("ppl batch ", ppl)
             val_running_ppl += ppl
             val_ppl.append(ppl)
             val_running_loss += loss_structural.item()        
@@ -84,12 +83,12 @@ def validate_game_compute_metrics(
             
             structural_drift = drift_meter.structural_drift(nl_captions)
             
-            structural_drifts.append(structural_drift)
+            structural_drifts.append(structural_drift.item())
             # also compute this for ground truth caption, as a reference value
             nl_true_captions = [[data_loader_val.dataset.vocab.idx2word[w.item()] for w in s] for s in captions]
             nl_true_captions = [" ".join(nl_true_caption) for nl_true_caption in nl_true_captions]
             structural_drift_true = drift_meter.structural_drift(nl_true_captions)
-            structural_drifts_true.append(structural_drift_true)
+            structural_drifts_true.append(structural_drift_true.item())
             
             ############
             # structural drift under a pretrained LM
@@ -105,7 +104,6 @@ def validate_game_compute_metrics(
 
             # overlap based drift metrics
             discrete_overlap = drift_meter.compute_discrete_overlap(captions_pred, captions, dist_captions)
-            print("Discrete overlap score ", discrete_overlap)
             discrete_overlaps.append(discrete_overlap)
             
             # get embeddings of the captions for discrete overlap computation
@@ -113,7 +111,6 @@ def validate_game_compute_metrics(
             _, target_embs = speaker_decoder.forward(both_images, captions, init_hidden) #decoder.embed(target_captions[i])
             _ , distractor_embs = speaker_decoder.forward(both_images, dist_captions, init_hidden)#decoder.embed(cat_samples)
             cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0].squeeze(), target_embs[0].squeeze(), distractor_embs[0].squeeze())
-            print("Continuous overlap ", cont_overlap)
             cont_overlaps.append(cont_overlap)
 
             # also compute image similarities
@@ -126,14 +123,18 @@ def validate_game_compute_metrics(
     print("out shape of cont ovelap list: ", len(cont_overlaps), cont_overlaps[0])
     
     
-    val_loss = val_running_loss / counter
-    val_ppl = val_running_ppl / counter
-    print("Final val loss ", val_loss)
-    print("Final val ppl ", val_ppl)
+    val_loss_out = val_running_loss / counter
+    val_ppl_out = val_running_ppl / counter
+    print("Final val loss ", val_loss_out)
+    print("Final val ppl ", val_ppl_out)
+    print("eval steps: ", eval_steps)
+    print("epochs out ", epochs_out)
     # TODO check if should write a file here or return means over the different batches            
     # possibly return lists and extend the extant ones in the main loop
     # check if I need a particular type of return for potential early stopping
-    return val_loss, val_ppl, epochs_out
+    return val_loss_out, val_ppl_out, val_losses, val_ppl, epochs_out, eval_steps,\
+        structural_drifts, structural_drifts_true, semantic_drifts, semantic_drifts_true,\
+        cont_overlaps, discrete_overlaps, image_similarities_val
 
 def play_game(
     log_file,
@@ -187,6 +188,10 @@ def play_game(
     discrete_overlaps = []
     cont_overlaps = []
     epochs_out = []
+    val_loss_avg = []
+    val_ppl_avg = []
+    val_losses_all = []
+    val_ppl_all = []
 
 
     lambda_s = lambda_s
@@ -229,13 +234,11 @@ def play_game(
         for i_step in range(1, total_steps+1):
             # set mode of the models
             speaker_decoder.train()
-            # speaker_encoder.train()
             listener_encoder.train()
             listener_rnn.train()
 
             # Randomly sample a caption length, and sample indices with that length.
             indices_pairs = data_loader.dataset.get_func_train_indices()
-            # print("inds ", indices_pairs)
             
             # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
             new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
@@ -243,7 +246,6 @@ def play_game(
             data_loader.batch_sampler.sampler = new_sampler_pairs
             # Obtain the target batch.
             images1, images2, target_features, distractor_features, captions, dist_captions = next(iter(data_loader))
-            # create target-distractor image tuples
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             captions = captions.to(device)    
             
@@ -286,17 +288,13 @@ def play_game(
             #######    
 
             # pass images and generated message form speaker through listener
-            # print("captions_pred ", captions_pred)
-            hiddens_scores, hidden = listener_rnn(captions_pred) #   preds_out
-            # TODO check if these should be tuples or separate img1, img2 lists for using pre-extracted features
+            hiddens_scores, hidden = listener_rnn(captions_pred)
             features = torch.cat((features1.unsqueeze(1), features2.unsqueeze(1)), dim=1)
-            # print("CONCAT FEATURES FOR LISTENER BEFORE PASSING INTO ENCODER ", features.shape)
-            predictions, scores = listener_encoder(features, hidden.squeeze(0)) # train_pairs
+            predictions, scores = listener_encoder(features, hidden.squeeze(0)) 
         
             ######
             # RL step
             # if target index and output index match, 1, else -1
-            
             accuracy = torch.sum(torch.eq(targets_list, predictions).to(torch.int64))/predictions.shape[0]
             accuracies.append(accuracy.item())
             rewards = [1 if x else -1 for x in torch.eq(targets_list, predictions).tolist()]
@@ -314,14 +312,10 @@ def play_game(
             ####
             # compute REINFORCE update
             rl_grads = update_policy.update_policy(rewards, log_probs, entropies, entropy_weight=entropy_weight) # check if log probs need to be stacked first
-            # print("RL rgrad: ", rl_grads.grad_fn.next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions[0][0].next_functions)
-            # compute entropies for each datapoint, to be weighted into loss
-            
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
             
             # Calculate the batch loss.
-            
             # REINFORCE for functional part, applied to speaker LSTM weights (maybe also Linear ones)
             # cross entropy for Listener
             # and also cross entropy for Speaker params, optimizing against target caption of the target image
@@ -331,7 +325,7 @@ def play_game(
             # compute distribution under pretrained model
 
             ###########
-            # KL divergence 
+            # KL divergence for regularization
             ###########
             # semantic_drift, pretrained_prob = drift_meter.semantic_drift(captions, both_images) 
             # # should probably also be averaged over batch for mean batch loss reduction
@@ -350,14 +344,8 @@ def play_game(
             # # print("---- batch level KL divergence ----- ", kl_div_batch)
             # kl_divs.append(kl_div_batch)
             # TODO double check + sign and whether the kl term requires grad
-            # print("raw outputs before computing structural loss ", raw_outputs.shape)
-            # print(raw_outputs.transpose(1,2).shape)
-            # print(captions.shape)
             loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) #+ kl_coeff * kl_div_batch
-            # print("Loss L s grads: ", loss_structural.grad_fn.next_functions)
             speaker_loss =  lambda_s*loss_structural + lambda_f*rl_grads
-            # print("Speaker LOSS grads ", speaker_loss.grad_fn )
-            # print("Speaker LOSS grads ", speaker_loss.grad_fn.next_functions )
             
             print("L_s: ", loss_structural, " L_f: ", rl_grads)
             
@@ -374,9 +362,7 @@ def play_game(
 
             # scheduler_s.step()
             # scheduler_l.step()
-            # print("Current scheduler LR: ", scheduler_s.get_last_lr(), scheduler_l.get_last_lr())     
             # Get training statistics.
-            # perplexity computation questionable
             stats = 'Epoch [%d/%d], Step [%d/%d], Speaker loss: %.4f, Listener loss: %.4f, Perplexity: %5.4f, Accuracy: %.4f' % (epoch, num_epochs, i_step, total_steps, speaker_loss.item(), listener_loss.item(), torch.exp(loss_structural), accuracy.item())
             
             speaker_losses_structural.append(loss_structural.item())
@@ -400,71 +386,35 @@ def play_game(
                 # TODO double check
                 # also compute the drift metrics during training to check the dynamics
 
-                val_loss, val_ppl, val_epochs = validate_game_compute_metrics(
-                    speaker_decoder=speaker_decoder,
-                    drift_meter=drift_meter,
-                    data_loader_val=data_loader_val,
-                    decoding_strategy=decoding_strategy,
-                )
-
-                # speaker_decoder.eval()
-                # init_hidden = speaker_decoder.init_hidden(1)
-                # for i in range(captions_pred.shape[0]): # iterate over sentences in batch
-                #     # semantic drift under pretrained captioning model
-                #     # decode caption to natural language for that
-                #     # outputs_ind = softmax(captions_pred[i])
-                #     # max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
-                    
-                #     eval_steps.append(i_step)
-                #     # structural drift under a pretrained LM
-                #     # decode caption to natural language for that
-                #     nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions_pred[i]]
-                #     nl_caption = " ".join(nl_caption)
-                #     structural_drift = drift_meter.structural_drift(nl_caption)
-                #     structural_drifts.append(structural_drift)
-                #     # also compute this for ground truth caption, as a reference value
-                #     nl_true_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in captions[i]]
-                #     nl_true_caption = " ".join(nl_true_caption)
-                #     structural_drift_true = drift_meter.structural_drift(nl_true_caption)
-                #     structural_drifts_true.append(structural_drift_true)
-                    
-                #     ############
-                #     # structural drift under a pretrained LM
-                    
-                #     # TODO check masking tokens after end
-                #     semantic_drift, _ = drift_meter.semantic_drift(captions_pred[i], both_images[i])
-                #     semantic_drifts.append(semantic_drift)
-                #     # print("----- Semantic drift ---- ", semantic_drift)
-                #     # for comparison, compute semantic drift of ground truth caption
-                #     semantic_drift_true, _ = drift_meter.semantic_drift(captions[i], both_images[i])
-                #     semantic_drifts_true.append(semantic_drift_true)
-                #     # print("----- Semantic drift ground truth ---- ", semantic_drift_true)
-
-                #     # overlap based drift metrics
-                #     discrete_overlap = drift_meter.compute_discrete_overlap(captions_pred[i], captions[i], dist_captions[i])
-                #     # print("Discrete overlap score ", discrete_overlap)
-                #     discrete_overlaps.append(discrete_overlap)
-                #     # TODO get embeddings of the captions for discrete overlap computation
-                #     with torch.no_grad():
-                #         _ , prediction_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), captions_pred[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
-                #         _, target_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), captions[i].unsqueeze(0), init_hidden) #decoder.embed(target_captions[i])
-                #         _ , distractor_embs = speaker_decoder.forward(both_images[i].unsqueeze(0), dist_captions[i].unsqueeze(0), init_hidden)#decoder.embed(cat_samples)
-                #     cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0], target_embs[0], distractor_embs[0])
-                #     # print("Continuous overlap ", cont_overlap)
-                #     cont_overlaps.append(cont_overlap)
-
-                #     # also compute image similarities
-                #     img_similarity_val = drift_meter.image_similarity(target_features[i], distractor_features[i])
-                #     image_similarities_val.append(img_similarity_val)
-                #     epochs_out.append(epoch)
-                    ############
+                val_loss_out, val_ppl_out, val_losses, val_ppl, epoch_out, eval_step,\
+                    structural_drift, structural_drift_true, semantic_drift, semantic_drift_true,\
+                    cont_overlap, discrete_overlap, image_similarity_val = validate_game_compute_metrics(
+                        speaker_decoder=speaker_decoder,
+                        drift_meter=drift_meter,
+                        data_loader_val=data_loader_val,
+                        decoding_strategy=decoding_strategy,
+                        epoch=epoch,
+                    )
+                val_loss_avg.append(val_loss_out)
+                val_ppl_avg.append(val_ppl_out)
+                val_losses_all.extend(val_losses)
+                val_ppl_all.extend(val_ppl)
+                epochs_out.extend(epoch_out)
+                eval_steps.extend(eval_step)
+                structural_drifts.extend(structural_drift)
+                structural_drifts_true.extend(structural_drift_true)
+                semantic_drifts.extend(semantic_drift)
+                semantic_drifts_true.extend(semantic_drift_true)
+                cont_overlaps.extend(cont_overlap)
+                discrete_overlaps.extend(discrete_overlap)
+                image_similarities_val.extend(image_similarity_val)
 
         # Save the weights.
         if epoch % save_every == 0:
-            speaker_trained_file = os.path.join('./models', 'speaker_' + experiment + '_vocab4000_' + 'ls_' + decoding_strategy + "_decoding_")
+            speaker_trained_file = os.path.join('./models', 'speaker_' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_")
             torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
-            listener_rnn_trained_file = os.path.join('./models', 'listener_rnn_' + experiment + '_vocab4000_' + 'ls_' + decoding_strategy + "_decoding_")
-            listener_encoder_trained_file = os.path.join('./models', 'listener_encoder_' + experiment + '_vocab4000_' + 'ls_' + decoding_strategy + "_decoding_")
+            listener_rnn_trained_file = os.path.join('./models', 'listener_rnn_' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_")
+            listener_encoder_trained_file = os.path.join('./models', 'listener_encoder_' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_")
             torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
             torch.save(listener_encoder.state_dict(), listener_encoder_trained_file+'%d.pkl' % epoch )
         
@@ -492,10 +442,16 @@ def play_game(
             "continuous_overlaps": cont_overlaps,
             "image_similarities": image_similarities_val,
             "epochs_out": epochs_out,
+            "losses": val_losses_all,
+            "ppl": val_ppl_all,
 
         })
         metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
     # Close the training log file.
     f.close()
 
-    return speaker_losses, speaker_losses_structural, speaker_losses_functional, perplexities, listener_losses, accuracies, structural_drifts, structural_drifts_true, semantic_drifts, semantic_drifts_true, discrete_overlaps, cont_overlaps, image_similarities_val, epochs_out, loss_str_val, ppl_val, val_steps
+    return speaker_losses, speaker_losses_structural,\
+        speaker_losses_functional, perplexities, listener_losses,\
+        accuracies, structural_drifts, structural_drifts_true, semantic_drifts,\
+        semantic_drifts_true, discrete_overlaps, cont_overlaps, image_similarities_val,\
+        epochs_out, val_losses_all, val_ppl_all, val_loss_avg, val_ppl_avg, eval_steps

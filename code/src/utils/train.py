@@ -20,7 +20,6 @@ def validate_model(
     # init params
     val_running_loss = 0.0
     counter = 0
-    total = 0
     embedded_imgs = torch.load("./notebooks/resnet_pretrain_embedded_val_imgs.pt")
     total_steps = math.ceil(len(data_loader_val.dataset.caption_lengths) / data_loader_val.batch_sampler.batch_size)
     print("Val total steps: ", total_steps+1)
@@ -128,9 +127,9 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_05_"
-    val_csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_05_"
-    csv_metrics = "pretrain_coco_512dim_teacher_forcing_05_"
+    csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_scheduled_desc_05_byEp_"
+    val_csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_scheduled_desc_05_byEp_"
+    csv_metrics = "pretrain_coco_512dim_teacher_forcing_forcing_scheduled_desc_05_byEp_"
     
     speaker_losses=[]
     perplexities = []
@@ -144,12 +143,14 @@ def pretrain_speaker(
     semantic_drifts_true = []
     discrete_overlaps = []
     cont_overlaps = []
+    train_type = []
+    forcing_rate = []
 
     # init the early stopper
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
     # teacher forcing schedule
-    use_teacher_forcing_rate = 0.5
+    use_teacher_forcing_rate = 1
 
     # embedded_imgs = torch.load("3dshapes_all_ResNet_features_reshaped_all.pt") #torch.cat(( torch.load("3dshapes_all_ResNet_features_reshaped_23000_first.pt"), torch.load("3dshapes_all_ResNet_features_reshaped_240000_first.pt") ), dim = 0) #torch.load("COCO_train_ResNet_features_reshaped.pt")
     # init drift meter for tracking structural drift for reference
@@ -164,7 +165,7 @@ def pretrain_speaker(
         vocab=len(data_loader.dataset.vocab)
     )
     softmax = nn.Softmax(dim=-1)
-    # hidden = decoder.init_hidden(64)
+    
     for epoch in range(1, num_epochs+1):
 
         for i_step in range(1, total_steps+1):
@@ -212,10 +213,14 @@ def pretrain_speaker(
             
             #### teacher forcing 
             if random.random() < use_teacher_forcing_rate:
-                print("Using teacher forcing")
+                # print("Using teacher forcing")
+                train_type.append("teacher_forcing")
+                forcing_rate.append(use_teacher_forcing_rate)
                 outputs, hidden = decoder(both_images, target_captions, hidden)
             else:
-                print("using self-regression")
+                # print("using self-regression")
+                forcing_rate.append(use_teacher_forcing_rate)
+                train_type.append("auto_regression")
                 decoder.eval()
                 # print(f"doing self-regression for {target_captions.shape[1]} steps")
                 # start_caption = torch.tensor([0, 0]).repeat(data_loader.batch_sampler.batch_size, 1)
@@ -310,8 +315,9 @@ def pretrain_speaker(
                     # image_similarities.append(cos_sim_img)
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-coco-512dim-teacher_forcing_05-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-coco-512dim-teacher_forcing_scheduled_desc_05_byEp-%d.pkl' % epoch))
             
+            use_teacher_forcing_rate = use_teacher_forcing_rate * 0.5
             # compute validation loss
             # with torch.no_grad():
                 # val_loss = validate_model(
@@ -343,7 +349,9 @@ def pretrain_speaker(
         df_out = pd.DataFrame({
             "steps": steps,
             "losses": speaker_losses,
-            "perplexities": perplexities
+            "perplexities": perplexities,
+            "train_type": train_type,
+            "forcing_rate": forcing_rate,
         })
         df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
 

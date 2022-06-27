@@ -45,9 +45,6 @@ def train_reference_game(
     TRAIN_METRICS_FILE,
     VAL_LOSSES_FILE,
     VAL_METRICS_FILE,
-    SPEAKER_FILE,
-    LISTENER_ENCODER_FILE,
-    LISTENER_DECODER_FILE,
     SPEAKER_PRETRAINED_FILE,
     NUM_IMG,
     PAIRS,
@@ -159,7 +156,7 @@ def train_reference_game(
             vocab_from_file=True,
             download_dir=DOWNLOAD_DIR_TRAIN,
             embedded_imgs=embedded_imgs,
-            num_imgs=int(NUM_IMG),
+            num_imgs=int(250),
             pairs=PAIRS,
         )
         print("NUMBER OF VALIDATION IMAGES ", len(data_loader_val.dataset.ids))
@@ -242,30 +239,33 @@ def train_reference_game(
     print("TOTAL STEPS:", total_steps)
 
     # training loop
-    loss_speaker_train, loss_str_train, loss_f_train, ppl_train, loss_l_train, acc_train, str_drift_pred, str_drift_true, sem_drift_pred, sem_drift_true, disc_overlaps, cont_overlaps, img_sims, epochs_metrics, loss_str_val, ppl_val, val_steps = play_game(
-        log_file=LOG_FILE,
-        num_epochs=EPOCHS,
-        total_steps=total_steps,
-        data_loader=data_loader_train, 
-        data_loader_val=data_loader_val,
-        speaker_decoder=speaker_decoder,
-        listener_encoder=listener_encoder, 
-        listener_rnn=listener_rnn,
-        criterion=criterion,
-        weights_path=WEIGHTS_PATH,
-        print_every=PRINT_EVERY,
-        save_every=SAVE_EVERY,
-        train_losses_file=TRAIN_LOSSES_FILE,
-        train_metrics_file=TRAIN_METRICS_FILE,
-        val_losses_file=VAL_LOSSES_FILE,
-        val_metrics_file=VAL_METRICS_FILE,
-        experiment=EXPERIMENT,
-        lambda_s=float(STRUCTURAL_WEIGHT),
-        pretrained_decoder_file=SPEAKER_PRETRAINED_FILE,
-        decoding_strategy=DECODING_STRATEGY,
-        mean_baseline=MEAN_BASELINE,
-        entropy_weight=float(ENTROPY_WEIGHT),
-    )
+    loss_speaker_train, loss_str_train, loss_f_train, ppl_train, loss_l_train,\
+        acc_train, str_drift_pred, str_drift_true, sem_drift_pred, sem_drift_true,\
+        disc_overlaps, cont_overlaps, img_sims, epochs_metrics, loss_str_val_all, ppl_val_all,\
+        loss_val_avg, ppl_val_avg, val_steps = play_game(
+            log_file=LOG_FILE,
+            num_epochs=EPOCHS,
+            total_steps=total_steps,
+            data_loader=data_loader_train, 
+            data_loader_val=data_loader_val,
+            speaker_decoder=speaker_decoder,
+            listener_encoder=listener_encoder, 
+            listener_rnn=listener_rnn,
+            criterion=criterion,
+            weights_path=WEIGHTS_PATH,
+            print_every=PRINT_EVERY,
+            save_every=SAVE_EVERY,
+            train_losses_file=TRAIN_LOSSES_FILE,
+            train_metrics_file=TRAIN_METRICS_FILE,
+            val_losses_file=VAL_LOSSES_FILE,
+            val_metrics_file=VAL_METRICS_FILE,
+            experiment=EXPERIMENT,
+            lambda_s=float(STRUCTURAL_WEIGHT),
+            pretrained_decoder_file=SPEAKER_PRETRAINED_FILE,
+            decoding_strategy=DECODING_STRATEGY,
+            mean_baseline=MEAN_BASELINE,
+            entropy_weight=float(ENTROPY_WEIGHT),
+        )
 
     # dump training stats to sacred db
     for i in range(len(loss_speaker_train)):
@@ -286,18 +286,19 @@ def train_reference_game(
         ex.log_scalar("continuous_overlaps", value=cont_overlaps[i], step=i)
         ex.log_scalar("image_similarities_val", value=img_sims[i], step=i)
         ex.log_scalar("epochs_val", value=epochs_metrics[i], step=i)
-        ex.log_scalar("loss_structural_val", value=loss_str_val[i], step=i)
-        ex.log_scalar("perplexities_val", value=ppl_val[i], step=i)
+        ex.log_scalar("loss_structural_val", value=loss_str_val_all[i], step=i)
+        ex.log_scalar("perplexities_val", value=ppl_val_all[i], step=i)
         ex.log_scalar("val_steps", value=val_steps[i], step=i)
-        
+    # dump evaluation round level averages
+    for i in range(len(loss_val_avg)):
+        ex.log_scalar("structural_drift_val_epoch_avg", value=loss_val_avg[i], step=i)
+        ex.log_scalar("ppl_val_epoch_avg", value=ppl_val_avg[i], step=i)
+            
     
 @ex.main 
 def run(_config):
-    losses, metrics = train_reference_game(**_config)
-    print(losses, metrics)
-    # ex.log_scalar("train_losses1", value=losses, step=[0, 1, 2])
-    # ex.log_scalar("train_metrics1", value=metrics, step = [0,1, 2])
-    # return losses, metrics
+    train_reference_game(**_config)
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -318,9 +319,6 @@ if __name__ == "__main__":
     parser.add_argument("-tm", "--train_metrics", help = "path to train drift metrics csv file")
     parser.add_argument("-vl", "--val_losses", help = "path to validation losses csv file")
     parser.add_argument("-vm", "--val_metrics", help = "path to validation drift metrics csv file")
-    parser.add_argument("-sd", "--speaker_decoder", help = "path for dumping speaker decoder model")
-    parser.add_argument("-le", "--listener_encoder", help = "path for dumping listener encoder model")
-    parser.add_argument("-ld", "--listener_decoder", help = "path for dumping listener decoder model")
     parser.add_argument("-s_pre", "--speaker_pretrained", help = "path to pretrained speaker decoder model")
     parser.add_argument("-n_img", "--num_images", help = "number of images to be used")
     parser.add_argument("-p", "--pairs", help = "type of target/distractor pairs (similar, random)", choices=["random", "similar"])
@@ -352,9 +350,6 @@ if __name__ == "__main__":
             TRAIN_METRICS_FILE=args.train_metrics
             VAL_LOSSES_FILE=args.val_losses
             VAL_METRICS_FILE=args.val_metrics
-            SPEAKER_FILE=args.speaker_decoder
-            LISTENER_ENCODER_FILE=args.listener_encoder
-            LISTENER_DECODER_FILE=args.listener_decoder
             SPEAKER_PRETRAINED_FILE=args.speaker_pretrained
             NUM_IMG=args.num_images
             PAIRS=args.pairs
@@ -379,9 +374,6 @@ if __name__ == "__main__":
             TRAIN_METRICS_FILE="",
             VAL_LOSSES_FILE="",
             VAL_METRICS_FILE="",
-            SPEAKER_FILE="",
-            LISTENER_ENCODER_FILE="",
-            LISTENER_DECODER_FILE="",
             SPEAKER_PRETRAINED_FILE="models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl",
             NUM_IMG=1000,
             PAIRS="random",

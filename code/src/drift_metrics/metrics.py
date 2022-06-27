@@ -166,7 +166,9 @@ class DriftMeter():
             neg_ll = outputs[0]
         # compute sentence-level LL
         sent_ll = -neg_ll.sum(-1)
-        return sent_ll
+        # compute batch-level drift
+        batch_ll = sent_ll.mean()
+        return batch_ll
 
     def image_similarity(self, img1, img2):
         """
