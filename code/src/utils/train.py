@@ -127,9 +127,9 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_scheduled_desc_05_byEp_"
-    val_csv_out = "../../data/pretrain_coco_512dim_teacher_forcing_scheduled_desc_05_byEp_"
-    csv_metrics = "pretrain_coco_512dim_teacher_forcing_forcing_scheduled_desc_05_byEp_"
+    csv_out = "../../data/pretrain_coco_512dim_scheduled_sampling_inverse_sigma_"
+    val_csv_out = "../../data/pretrain_coco_512dim_scheduled_sampling_inverse_sigma_"
+    csv_metrics = "pretrain_coco_512dim_scheduled_sampling_inverse_sigma_"
     
     speaker_losses=[]
     perplexities = []
@@ -150,7 +150,10 @@ def pretrain_speaker(
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
     # teacher forcing schedule
-    use_teacher_forcing_rate = 1
+    use_teacher_forcing_rate = "scheduled"
+    # the value of the inverse sigmoid below is subject to hyperparam tuning as well
+    # the higher the number, the longer teacher focing will be used
+    k = 30
 
     # embedded_imgs = torch.load("3dshapes_all_ResNet_features_reshaped_all.pt") #torch.cat(( torch.load("3dshapes_all_ResNet_features_reshaped_23000_first.pt"), torch.load("3dshapes_all_ResNet_features_reshaped_240000_first.pt") ), dim = 0) #torch.load("COCO_train_ResNet_features_reshaped.pt")
     # init drift meter for tracking structural drift for reference
@@ -193,8 +196,7 @@ def pretrain_speaker(
             targets = targets.to(device)
             distractors = distractors.to(device)
             target_captions = target_captions.to(device)
-            print("TARGET CAPTIONS shape: ", target_captions.shape)
-
+            
             # Zero the gradients (reset).
             decoder.zero_grad()
             # encoder.zero_grad()
@@ -211,17 +213,52 @@ def pretrain_speaker(
             # concat image features
             both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1) # [target_features, distractor_features]
             
-            #### teacher forcing 
-            if random.random() < use_teacher_forcing_rate:
-                # print("Using teacher forcing")
-                train_type.append("teacher_forcing")
-                forcing_rate.append(use_teacher_forcing_rate)
-                outputs, hidden = decoder(both_images, target_captions, hidden)
+            ### scheduled sampling 
+            if use_teacher_forcing_rate == "scheduled":
+                p = (k / (k + np.exp(i_step / k)))
+                
+                forcing_rate.append(p)
+                train_type.append("scheduled_sampling")
+                # init
+                indices = []
+                outputs = [] # for structural loss computation
+                init_hiddens = decoder.init_hidden(data_loader.batch_sampler.batch_size) # Get initial hidden state of the LSTM
+                
+                # create initial caption input: "START"
+                cat_samples = torch.tensor([0, 0]).repeat(data_loader.batch_sampler.batch_size, 1)
+                
+                for i in range(target_captions.shape[-1]-1):
+                    out, hidden_state = decoder.forward(both_images, cat_samples, init_hiddens)
+                    outputs.append(out)
+                    probs = softmax(out)
+
+                    # flip coin which token to use
+                    if np.random.choice([True, False], 1, p = [p, 1-p]):
+                        
+                        cat_samples = target_captions[:, i+1].unsqueeze(1) # i + 1 to skip start token 
+                    # auto-regression option
+                    else:
+                       
+                        # only do pure sampling for now
+                        cat_dist = torch.distributions.categorical.Categorical(probs)
+                        cat_samples = cat_dist.sample()
+                    indices.append(cat_samples)
+                    cat_samples = torch.cat((cat_samples, cat_samples), dim = -1)
+
+                outputs = torch.stack(outputs, dim=1).squeeze(2)
+
+            #### classic teacher forcing 
             else:
-                # print("using self-regression")
-                forcing_rate.append(use_teacher_forcing_rate)
-                train_type.append("auto_regression")
-                decoder.eval()
+                if random.random() < use_teacher_forcing_rate:
+                    # print("Using teacher forcing")
+                    train_type.append("teacher_forcing")
+                    forcing_rate.append(use_teacher_forcing_rate)
+                    outputs, hidden = decoder(both_images, target_captions, hidden)
+                else:
+                    # print("using self-regression")
+                    forcing_rate.append(use_teacher_forcing_rate)
+                    train_type.append("auto_regression")
+                    decoder.eval()
                 # print(f"doing self-regression for {target_captions.shape[1]} steps")
                 # start_caption = torch.tensor([0, 0]).repeat(data_loader.batch_sampler.batch_size, 1)
                 # for i in range(target_captions.shape[1] - 1):
@@ -231,8 +268,8 @@ def pretrain_speaker(
                 #     # duplicate index for passing through the cutoff in the forward step
                 #     start_caption = torch.cat((pred_ind, pred_ind), dim = -1)
                 #     print("Duplicated predicted index: ", start_caption.shape)
-                max_seq_length = target_captions.shape[1]-1
-                captions_pred, log_probs, outputs, entropies = decoder.sample(both_images, max_sequence_length=max_seq_length)
+                    max_seq_length = target_captions.shape[1]-1
+                    captions_pred, log_probs, outputs, entropies = decoder.sample(both_images, max_sequence_length=max_seq_length)
                 # print("FINAL SHAPE of SAMPLED: ", outputs.shape)
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
@@ -315,9 +352,9 @@ def pretrain_speaker(
                     # image_similarities.append(cos_sim_img)
         # Save the weights.
         if epoch % save_every == 0:
-            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-coco-512dim-teacher_forcing_scheduled_desc_05_byEp-%d.pkl' % epoch))
+            torch.save(decoder.state_dict(), os.path.join('./models', 'decoder-coco-512dim-scheduled_sampling_inverse_sigma-%d.pkl' % epoch))
             
-            use_teacher_forcing_rate = use_teacher_forcing_rate * 0.5
+            # use_teacher_forcing_rate = use_teacher_forcing_rate * 0.5
             # compute validation loss
             # with torch.no_grad():
                 # val_loss = validate_model(

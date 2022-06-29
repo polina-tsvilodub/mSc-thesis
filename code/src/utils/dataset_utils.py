@@ -91,7 +91,7 @@ class COCOCaptionsDataset(Dataset):
                 else:
                     self.ids = torch.load(dataset_path).tolist()
             else:
-                self.ids = _ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+                self.ids = torch.load("train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             # set the image IDs for validation during early stopping to avoid overlapping images
             self.ids_val = torch.load("train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
@@ -103,9 +103,9 @@ class COCOCaptionsDataset(Dataset):
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
             # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_lf01.pt")
-            torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_30000_coco_teacher_forcing_scheduled_desc_05_byEp.pt")
+            # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            # torch.save(torch.tensor(self.ids_val), "pretrain_val_img_IDs_2imgs_1024dim.pt")
+            torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_scheduled_sampling_inverse_sigma.pt")
 
         elif mode == "val":
             with open("notebooks/imgID2annID_val.json", "r") as fp:
