@@ -2,7 +2,7 @@
 # i.e., track ther (dis)similarity, to be able to make to caption granularity comparison to the second experiment
 
 import os
-from utils.build_dataset import make_dataset, get_loader
+from utils.build_dataset import make_dataset, get_loader, get_loader_3dshapes
 from utils.download import maybe_download_and_extract
 from utils.train import pretrain_speaker
 from utils.early_stopping import EarlyStopping
@@ -52,6 +52,8 @@ def train_reference_game(
     DECODING_STRATEGY,
     MEAN_BASELINE,
     ENTROPY_WEIGHT,
+    USE_ENCODE_LS,
+    DEBUG=False,
     **kwargs
 ):
     """
@@ -76,7 +78,7 @@ def train_reference_game(
     # Fixed length allowed for any sequence
     MAX_SEQUENCE_LENGTH = MAX_SEQUENCE_LEN
     # path / name of vocab file
-    VOCAB_FILE = "../../data/vocab4000.pkl" #
+    VOCAB_FILE = VOCAB_FILE #
 
     # Model Dimensions
     EMBED_SIZE = 512 # dimensionality of word embeddings
@@ -172,17 +174,21 @@ def train_reference_game(
                                 (0.229, 0.224, 0.225))])
         DOWNLOAD_DIR_TRAIN = "../../data"
         # path to pre-saved image features file
-        embedded_imgs = torch.load("3dshapes_all_ResNet_features_reshaped_all_sq.pt")
-
+        embedded_imgs = torch.load("train_logs/3dshapes_all_ResNet_features_reshaped_all_sq.pt")
+        print("executing 3d shapes part")
+        print(VOCAB_FILE)
         data_loader_train = get_loader_3dshapes(
             transform=transform_train,
             mode=MODE,
             batch_size=BATCH_SIZE,
             vocab_threshold=VOCAB_THRESHOLD,
-            vocab_file=VOCAB_FILE,
+            vocab_file=str(VOCAB_FILE),
             vocab_from_file=VOCAB_FROM_FILE,
             download_dir=DOWNLOAD_DIR_TRAIN,
             embedded_imgs=embedded_imgs,
+            dataset_path=DATASET,
+            num_imgs=int(NUM_IMG),
+            pairs=PAIRS,
         )
 
         data_loader_val = get_loader_3dshapes(
@@ -190,10 +196,13 @@ def train_reference_game(
             mode=MODE,
             batch_size=BATCH_SIZE,
             vocab_threshold=VOCAB_THRESHOLD,
-            vocab_file=VOCAB_FILE,
+            vocab_file=str(VOCAB_FILE),
             vocab_from_file=VOCAB_FROM_FILE,
             download_dir=DOWNLOAD_DIR_TRAIN,
             embedded_imgs=embedded_imgs,
+            dataset_path=DATASET,
+            num_imgs=int(250),
+            pairs=PAIRS,
         )
     
 
@@ -265,34 +274,35 @@ def train_reference_game(
             decoding_strategy=DECODING_STRATEGY,
             mean_baseline=MEAN_BASELINE,
             entropy_weight=float(ENTROPY_WEIGHT),
+            use_encode_ls=USE_ENCODE_LS,
         )
-
-    # dump training stats to sacred db
-    for i in range(len(loss_speaker_train)):
-        ex.log_scalar("speaker_loss_train", value=loss_speaker_train[i], step=i)
-        ex.log_scalar("loss_structural_train", value=loss_str_train[i], step=i)
-        ex.log_scalar("loss_functional_train", value=loss_f_train[i], step=i)
-        ex.log_scalar("perplexities_train", value=ppl_train[i], step=i)
-        ex.log_scalar("loss_listener_train", value=loss_l_train[i], step=i)
-        ex.log_scalar("listener_acc_train", value=acc_train[i], step=i)
-        
-    # dump val stats to sacred db
-    for i in range(len(val_steps)):
-        ex.log_scalar("structural_drift_pred", value=str_drift_pred[i], step=i)
-        ex.log_scalar("structural_drift_true", value=str_drift_true[i], step=i)
-        ex.log_scalar("semantic_drift_pred", value=sem_drift_pred[i], step=i)
-        ex.log_scalar("semantic_drift_true", value=sem_drift_true[i], step=i)
-        ex.log_scalar("discrete_overlaps", value=disc_overlaps[i], step=i)
-        ex.log_scalar("continuous_overlaps", value=cont_overlaps[i], step=i)
-        ex.log_scalar("image_similarities_val", value=img_sims[i], step=i)
-        ex.log_scalar("epochs_val", value=epochs_metrics[i], step=i)
-        ex.log_scalar("loss_structural_val", value=loss_str_val_all[i], step=i)
-        ex.log_scalar("perplexities_val", value=ppl_val_all[i], step=i)
-        ex.log_scalar("val_steps", value=val_steps[i], step=i)
-    # dump evaluation round level averages
-    for i in range(len(loss_val_avg)):
-        ex.log_scalar("structural_drift_val_epoch_avg", value=loss_val_avg[i], step=i)
-        ex.log_scalar("ppl_val_epoch_avg", value=ppl_val_avg[i], step=i)
+    if not DEBUG:
+        # dump training stats to sacred db
+        for i in range(len(loss_speaker_train)):
+            ex.log_scalar("speaker_loss_train", value=loss_speaker_train[i], step=i)
+            ex.log_scalar("loss_structural_train", value=loss_str_train[i], step=i)
+            ex.log_scalar("loss_functional_train", value=loss_f_train[i], step=i)
+            ex.log_scalar("perplexities_train", value=ppl_train[i], step=i)
+            ex.log_scalar("loss_listener_train", value=loss_l_train[i], step=i)
+            ex.log_scalar("listener_acc_train", value=acc_train[i], step=i)
+            
+        # dump val stats to sacred db
+        for i in range(len(val_steps)):
+            ex.log_scalar("structural_drift_pred", value=str_drift_pred[i], step=i)
+            ex.log_scalar("structural_drift_true", value=str_drift_true[i], step=i)
+            ex.log_scalar("semantic_drift_pred", value=sem_drift_pred[i], step=i)
+            ex.log_scalar("semantic_drift_true", value=sem_drift_true[i], step=i)
+            ex.log_scalar("discrete_overlaps", value=disc_overlaps[i], step=i)
+            ex.log_scalar("continuous_overlaps", value=cont_overlaps[i], step=i)
+            ex.log_scalar("image_similarities_val", value=img_sims[i], step=i)
+            ex.log_scalar("epochs_val", value=epochs_metrics[i], step=i)
+            ex.log_scalar("loss_structural_val", value=loss_str_val_all[i], step=i)
+            ex.log_scalar("perplexities_val", value=ppl_val_all[i], step=i)
+            ex.log_scalar("val_steps", value=val_steps[i], step=i)
+        # dump evaluation round level averages
+        for i in range(len(loss_val_avg)):
+            ex.log_scalar("structural_drift_val_epoch_avg", value=loss_val_avg[i], step=i)
+            ex.log_scalar("ppl_val_epoch_avg", value=ppl_val_avg[i], step=i)
             
     
 @ex.main 
@@ -326,10 +336,11 @@ if __name__ == "__main__":
 
     # grid search specific parameters
     parser.add_argument("-l_s", "--lambda_structural", help = "weight of structural loss")
-    parser.add_argument("-str", "--decoding_strategy", help = "decoding strategy for speaker", choices = ["pure", "greedy", "exp"])
+    parser.add_argument("-str", "--decoding_strategy", help = "decoding strategy for speaker", choices = ["pure", "greedy", "exp", "topk_temperature"])
     parser.add_argument("-mb", "--mean_baseline", help = "use mean baseline subtraction?", action="store_true")
     parser.add_argument("-entr", "--entropy_weight", help = "weight of entropy regularization of REINFORCE")
     parser.add_argument("-l_f", "--lambda_functional", help = "weight of functional loss")
+    parser.add_argument("-ls_comp", "--loss_s_comp", help = "way of computing the structural loss, whether to use pretrain-style encoding", action="store_true")
     
     
     args = parser.parse_args()
@@ -338,6 +349,7 @@ if __name__ == "__main__":
 
         @ex.config
         def config():
+            print(args.vocab_file)
             EPOCHS=args.epochs
             EXPERIMENT=args.experiment
             DATASET=args.dataset
@@ -357,28 +369,52 @@ if __name__ == "__main__":
             DECODING_STRATEGY=args.decoding_strategy
             MEAN_BASELINE=args.mean_baseline
             ENTROPY_WEIGHT=args.entropy_weight
+            USE_ENCODE_LS=args.loss_s_comp
         
         ex.run()
     else:
         # just execute train loop
+        EPOCHS=args.epochs
+        EXPERIMENT=args.experiment
+        DATASET=args.dataset
+        VAL_DATASET=args.dataset_val
+        MAX_SEQUENCE_LEN=args.max_sequence
+        BATCH_SIZE=args.batch_size
+        LOG_FILE=args.log_file
+        VOCAB_FILE=args.vocab_file
+        TRAIN_LOSSES_FILE=args.train_losses
+        TRAIN_METRICS_FILE=args.train_metrics
+        VAL_LOSSES_FILE=args.val_losses
+        VAL_METRICS_FILE=args.val_metrics
+        SPEAKER_PRETRAINED_FILE=args.speaker_pretrained
+        NUM_IMG=args.num_images
+        PAIRS=args.pairs
+        STRUCTURAL_WEIGHT=args.lambda_structural
+        DECODING_STRATEGY=args.decoding_strategy
+        MEAN_BASELINE=args.mean_baseline
+        ENTROPY_WEIGHT=args.entropy_weight
+        USE_ENCODE_LS=args.loss_s_comp
+        
         train_reference_game(
-            EPOCHS=2,
-            EXPERIMENT="coco",
-            DATASET="train_logs/ref-game_img_IDs_15000_coco_lf01.pt",
-            VAL_DATASET="notebooks/val_split_IDs_from_COCO_train_tensor.pt",
-            MAX_SEQUENCE_LEN=15,
-            BATCH_SIZE=64,
-            LOG_FILE="../../data/debug_log_file.txt",
-            VOCAB_FILE="../../data/vocab4000.pkl",
-            TRAIN_LOSSES_FILE="",
-            TRAIN_METRICS_FILE="",
-            VAL_LOSSES_FILE="",
-            VAL_METRICS_FILE="",
-            SPEAKER_PRETRAINED_FILE="models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl",
-            NUM_IMG=1000,
-            PAIRS="random",
-            STRUCTURAL_WEIGHT=0.9,
-            DECODING_STRATEGY="pure",
-            MEAN_BASELINE=False,
-            ENTROPY_WEIGHT=0.1,
+            EPOCHS=EPOCHS,
+            EXPERIMENT=EXPERIMENT,
+            DATASET=DATASET,
+            VAL_DATASET=VAL_DATASET,
+            MAX_SEQUENCE_LEN=MAX_SEQUENCE_LEN,
+            BATCH_SIZE=BATCH_SIZE,
+            LOG_FILE=LOG_FILE,
+            VOCAB_FILE=VOCAB_FILE,
+            TRAIN_LOSSES_FILE=TRAIN_LOSSES_FILE,
+            TRAIN_METRICS_FILE=TRAIN_METRICS_FILE,
+            VAL_LOSSES_FILE=VAL_LOSSES_FILE,
+            VAL_METRICS_FILE=VAL_METRICS_FILE,
+            SPEAKER_PRETRAINED_FILE=SPEAKER_PRETRAINED_FILE,
+            NUM_IMG=NUM_IMG,
+            PAIRS=PAIRS,
+            STRUCTURAL_WEIGHT=STRUCTURAL_WEIGHT,
+            DECODING_STRATEGY=DECODING_STRATEGY,
+            MEAN_BASELINE=MEAN_BASELINE,
+            ENTROPY_WEIGHT=ENTROPY_WEIGHT,
+            USE_ENCODE_LS=USE_ENCODE_LS,
+            DEBUG=DEBUG,
         )

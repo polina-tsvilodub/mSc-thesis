@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models 
-
+import numpy as np
 
 
 class DecoderRNN(nn.Module):
@@ -82,7 +82,7 @@ class DecoderRNN(nn.Module):
         outputs = self.linear(hiddens)
         return outputs, hidden_state
     
-    def sample(self, inputs, max_sequence_length, decoding_strategy):
+    def sample(self, inputs, max_sequence_length, decoding_strategy, temperature=2):
         """
         Function for sampling a caption during functional (reference game) training.
         Implements greedy sampling. Sampling stops when END token is sampled or when max_sequence_length is reached.
@@ -118,8 +118,9 @@ class DecoderRNN(nn.Module):
         # outsource first step bc of image projection
         out, hidden_state = self.forward(inputs, caption, init_hiddens)
         raw_outputs.append(out) #.extend(out)
-        probs = softmax(out)
+        
         if decoding_strategy == "pure":
+            probs = softmax(out)
             cat_dist = torch.distributions.categorical.Categorical(probs)
             cat_samples = cat_dist.sample()
             entropy = cat_dist.entropy()
@@ -127,15 +128,34 @@ class DecoderRNN(nn.Module):
             log_p = cat_dist.log_prob(cat_samples)
         elif decoding_strategy == "greedy":
             # print("using greedy")
+            probs = softmax(out)
             max_probs, cat_samples = torch.max(probs, dim = -1)
             log_p = torch.log(max_probs)
         elif decoding_strategy == "exp":
-            probs = softmax(probs**5)
+            probs = softmax(out**5)
             cat_dist = torch.distributions.categorical.Categorical(probs)
             cat_samples = cat_dist.sample()
             entropy = cat_dist.entropy()
             entropies.append(entropy)
             log_p = cat_dist.log_prob(cat_samples)
+        elif decoding_strategy == "topk_temperature":
+            probs = softmax(out/temperature)
+            # print("probs ", probs.shape)
+            topk_probs, topk_inds = torch.topk(probs, 20, dim = -1)
+            # print(topk_inds.shape)
+            # zero out and renormalize (https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277)
+            for i in range(topk_inds.shape[0]):
+                index2zero = torch.zeros(probs.shape[-1]) # , dtype=bool
+                index2zero[topk_inds[i, : , :].squeeze(0).squeeze(0)] = 1
+                # probs[i, :, index2zero] = 0.0
+                probs[i] = probs[i] * index2zero
+            probs = softmax(probs)
+            cat_dist = torch.distributions.categorical.Categorical(probs)
+            cat_samples = cat_dist.sample()
+            entropy = cat_dist.entropy()
+            entropies.append(entropy)
+            log_p = cat_dist.log_prob(cat_samples)
+
         else: 
             raise ValueError(f"Decoding strategy {decoding_strategy} is not implemented!")  
 
@@ -171,6 +191,22 @@ class DecoderRNN(nn.Module):
                 entropies.append(entropy)
             elif decoding_strategy == "exp":
                 probs = softmax(probs**5)
+                cat_dist = torch.distributions.categorical.Categorical(probs)
+                cat_samples = cat_dist.sample()
+                entropy = cat_dist.entropy()
+                entropies.append(entropy)
+                log_p = cat_dist.log_prob(cat_samples)
+            elif decoding_strategy == "topk_temperature":
+                probs = softmax(out/temperature)
+                probs4zero = probs.clone()
+                topk_probs, topk_inds = torch.topk(probs.detach(), 20, dim = -1)
+                # zero out and renormalize (https://towardsdatascience.com/how-to-sample-from-language-models-682bceb97277)
+                for i in range(topk_inds.shape[0]):
+                    index2zero = torch.zeros(probs.shape[-1]) # , dtype=bool
+                    index2zero[topk_inds[i, : , :].squeeze(0).squeeze(0)] = 1
+                    # probs[i, :, index2zero] = 0.0
+                    probs[i] = probs[i] * index2zero
+                probs = softmax(probs)
                 cat_dist = torch.distributions.categorical.Categorical(probs)
                 cat_samples = cat_dist.sample()
                 entropy = cat_dist.entropy()

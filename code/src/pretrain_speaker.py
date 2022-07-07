@@ -40,10 +40,10 @@ VISUAL_EMBED_SIZE = 512 # dimensionality of visual embeddings
 
 # Other training parameters
 BATCH_SIZE = 64
-EPOCHS = 1 # number of training epochs
+EPOCHS = 2 # number of training epochs
 PRINT_EVERY = 200 # window for printing average loss (steps)
 SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_scheduled_sampling_inverse_sigma.txt' # name of file with saved training loss and perplexity
+LOG_FILE = '../../data/pretraining_speaker_noEnc_prepend_512dim_4000vocab_scheduled_sampling_wGreedyDecoding_k150.txt' # name of file with saved training loss and perplexity
 MODE= 'train' # network mode
 WEIGHTS_PATH='../../data/models'
 NUM_VAL_IMGS=3700
@@ -141,7 +141,7 @@ print("VOCAB SIZE: ", vocab_size)
 # print("LOADED ENCODER WEIGHTS!")
 # encoder.load_state_dict(torch.load("models/encoder-2imgs-1024dim-2000vocab-1.pkl"))
 decoder = DecoderRNN(EMBED_SIZE, HIDDEN_SIZE, vocab_size, VISUAL_EMBED_SIZE)
-# decoder.load_state_dict(torch.load("models/decoder-coco-512dim-teacher_forcing_05-1.pkl"))
+# decoder.load_state_dict(torch.load("models/decoder-coco-512dim-teacher_forcing_scheduled_desc_05_byEp-7.pkl"))
 
 # Move models to GPU if CUDA is available. 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

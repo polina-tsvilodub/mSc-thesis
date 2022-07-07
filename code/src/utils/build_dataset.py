@@ -175,6 +175,9 @@ def get_loader_3dshapes(transform,
                vocab_from_pretrained=False,
                categorize_imgs=False,
                embedded_imgs="COCO_train_ResNet_features_reshaped_dict.pt",
+               num_imgs=0,
+               pairs="random",
+               dataset_path=None,
               ):
     """Returns the data loader.
     Args:
@@ -232,6 +235,9 @@ def get_loader_3dshapes(transform,
         max_sequence_length=25,
         categorize_imgs=categorize_imgs,
         embedded_imgs=embedded_imgs,
+        dataset_path=dataset_path,
+        pairs=pairs,
+        num_imgs=num_imgs,
     )
     
 

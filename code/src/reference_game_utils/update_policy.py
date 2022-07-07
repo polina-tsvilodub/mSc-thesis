@@ -25,9 +25,8 @@ def update_policy(rewards, log_probs, entropies, entropy_weight=0.1):
     sentence_entropies = entropies.sum(dim=1)
     for log_prob, Gt, h in zip(sentence_prob, rewards, sentence_entropies):
         # TODO double check sign
-        # print("Regularization term: ", h, log_prob, Gt)
-
-        policy_gradient.append(-(log_prob * Gt + entropy_weight * h))
+        
+        policy_gradient.append(-(log_prob.to(dtype=torch.long) * Gt + entropy_weight * h.to(dtype=torch.long)))
     # here, we average over the batch to match the CCE operation for the joint loss
     policy_gradient = torch.stack(policy_gradient).mean()
     

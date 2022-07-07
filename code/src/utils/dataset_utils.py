@@ -75,7 +75,7 @@ class COCOCaptionsDataset(Dataset):
             # shuffle(_ids)
             ####
             # read imd2annID file. select N images, get all ann IDs => ids
-            with open("notebooks/imgID2annID.json", "r") as fp:
+            with open("imgID2annID.json", "r") as fp:
                 f = json.load(fp)
             imgIDs4train = list(f.keys())[:30000] # 
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
@@ -91,9 +91,9 @@ class COCOCaptionsDataset(Dataset):
                 else:
                     self.ids = torch.load(dataset_path).tolist()
             else:
-                self.ids = torch.load("train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+                self.ids = torch.load("../train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             # set the image IDs for validation during early stopping to avoid overlapping images
-            self.ids_val = torch.load("train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
+            self.ids_val = torch.load("../train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
             all_tokens = [tokenizer(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))] 
@@ -102,10 +102,10 @@ class COCOCaptionsDataset(Dataset):
             self.caption_lengths_val = [len(token) for token in all_tokens_val] 
             # print pretraining IDs for later separation from functional training
             # save used indices to torch file
-            # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_lf01.pt")
+            # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_pretrainGrid_decr05.pt")
             # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_scheduled_sampling_inverse_sigma.pt")
+            # torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_scheduled_sampling_inverse_sigma_ExpDecoding_k150.pt")
 
         elif mode == "val":
             with open("notebooks/imgID2annID_val.json", "r") as fp:
@@ -327,6 +327,9 @@ class threeDshapes_Dataset(Dataset):
         pad_token, 
         vocab_from_file, 
         embedded_imgs,
+        dataset_path,
+        num_imgs,
+        pairs,
         vocab_from_pretrained=False,
         max_sequence_length=0,
         categorize_imgs=False,
@@ -352,7 +355,13 @@ class threeDshapes_Dataset(Dataset):
                 self.labels_short = json.load(fp)
                 
             
-            imgIDs4train = torch.load("ref_game_imgIDs_unique_wShortCaps_3dshapes.pt") #np.random.choice(list(self.labels.keys()), 30000) # train split, torch.load("pretrain_img_IDs_unique_3dshapes_final_pretrain.pt") #
+            if dataset_path is not None:
+                if num_imgs != 0:
+                    imgIDs4train = torch.load(dataset_path)[:num_imgs]
+                else:
+                    imgIDs4train = torch.load(dataset_path)
+            else:
+                imgIDs4train = np.random.choice(list(self.labels.keys()), 30000) # train split, torch.load("pretrain_img_IDs_unique_3dshapes_final_pretrain.pt") #
             print("len of img ids: ", len(imgIDs4train))
             _ids = [(self.labels[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             # _ids_short = [(self.labels_short[i], i) for i in imgIDs4train] 
