@@ -1,7 +1,102 @@
-Literature review notes go here.
+Literature review notes go here. \pt{This more technical stuff should go into a chapter before multi-agent communication. It can be framed as background and approaches to image captioning which are traditional in the sense that they are supervised. The transition to multi-agent communication could be task-specific or -conditional communication about visual environment which is a critically functional part of human communication. Chapter AFTER multi-agents should be language drift (jacob, lewis, andreas, 2021: multitasking inhibits drift ).}
+
+\section{Introduction}
 
 Make a table of definitions.
 
-Sender / sepaker, receiver / listener, agents, message, distractor target. 
+Sender / sepaker, receiver / listener, agents, message, distractor target. Image vectore representations extracted by a CNN / visual module = image features, backprop with ref. Reinforcement Learning = RL.
+Do I need a more general section on like NNs, img captioning etc?
 
-\pt{Summarise in detail base paper}
+Maybe some RL stuff about the transitions, the stationary distribution etc?
+
+
+\section{Image Captioning}
+Producing sensible and informative captions for images has been a task that has received increasing attention in machine learning research over the last years. Importantly, in this domain, producing image captions in general is the only task of the developed applications; that is, the captions are not supposed to target any particular actionable goal other than producing captions close to the human examples seen during training---they are \textit{task-unconditional}. \pt{Point is clear, but sharpen the actual formulation. } From a machine learning perspective, the prerequisite for making image captions task-conditional would be the availability of supervised data from such a task. \pt{As discussed in the introduction, this motivates the choice of the multi-agent framework. Include and sharpen.} Nonetheless, technical advances developed in this domain provide the basis for agents employed in multi-agent settings; therefore, this section reviews selected work on image captioning in the computer vision and machine learning domain. 
+
+In their seminal work, \cite{karpathy2015deep}...:
+\begin{itemize}
+	\item CNN extracting regions: A Region CNN, pretrained on ImageNet and finetuned on 200 classes from ImageNet Detection Challenge, top 19 detected regions + whole image are kept and embedded intp 4096 dimensional space
+	\item BRNN over captions, to address isue of dependencies etc when embedding words into visual space, using 300-dimensional word2vec embeddings. 
+	\item compute alignment between them, predict captions based on inferred alignment through new Multimodal RNN architecture
+	\item basic assumption: sentences are weak labels, which corespond to some unknown location in the image
+	\item mention previous work where sentence templates are filled based on image content -- important for 3Dshapes experiment
+	\item bidirectional recurrent net used to compute word representations, novel objective when learning alignment
+	\item new objective: image-sentence score: dot product as single best alignment of a word to one image region, with margin maximization between align image-sentence pairs vs non-aligned ones
+	\item goal: align text snippets, not only single words, to bounding boxes. This is achieved by treating the true alignment as a Markov Random Field, such that interactions between neighbouring words encourage alignment to the sam region.
+	\item Multimpdal RNN: takes image pixels and a sequence of input vectors as input, where the image embedding is input as an additional bias at timestep 1. Hidden layer size is 512. The hidden layers are initialized with 0. They provide other important optimization details.
+	\item They preprocess the sentences to lower-case, discarding non-alphanumeric characters. Importantly, they only keep words with frequency at least 5, resulting in 8791 words for 123000 MS COCO images. 
+	\item the critical novelty is in the max margin loss which integrates the alignment score, which is used to train the BRNN
+	\item ranking comparison on MS COCO reported -- check if I'll be able to compare to their performance.
+	\item unclear how they train the MultimodelRNN on the alignment input -- they actually take the predicted labels for given bounding boxes from step before. For some reason, the annotators were asked to draw the bounding boxes, as opposed to receiving the ones proposed by the model.
+\end{itemize}
+
+\pt{This should actually be discussed as the first architecture.} A similar architecture was developed by \cite{vinyals2015show}: the image captioner uses a CNN-based image feature extractor in order to extract vector representations from raw images, which are fed into an LSTM-based recurrent \textit{decoder} module, trained end-to-end to maximize the likelihood $\theta^* = argmax_{x} \sum_{(I, S)} log\; p(S \mid I; \theta)$ of example image descriptions $S$, given the image vector $I$ and the network parameters $\theta$. The descriptions are vectorized by a trainable embedding layer through which they are passed before being passed through the LSTM. \pt{Figure XX exemplifies the proposed training pipeline and the LSTM cell architecture.} The minimized loss is the sum of negative log likelihoods of the target words at each time step. 
+This architecture is closely related to the architecture of the sender agent in the present experiments. 
+
+\subsection{Model Pretraining}
+
+In this section, different approaches for training recurrent models which are predicting sequences, like the image captioning model is predicting a caption given the image, are discussed. In the context of multi-agent reference game experiments discussed in this thesis, this step can be seen as speaker agent pretraining.
+
+It is assumed that the target task for the model is predicting the next token of a sequence, given the preceding tokens; this task is at the core of various applications like neural machine translation, image caption generation, text sumamrization and others \pt{REF}. This task is usually modelled by recurrent neural networks \pt{ref}. The challenge when training recurrent neural network models which are predicting sequences at inference time by replicating the inference time scenario, i.e., by conditioning the next token on the output of the model itself at the previous timestep, is slow convergence of the training, its instability and potentially poor generation skills \pt{Maybe just the ML book, but more specifics on the issues are needed. Original source: https://machinelearningmastery.com/teacher-forcing-for-recurrent-neural-networks/ }. The main approach that has been proposed in order to mitigate these issues is \textit{teacher forcing}, with several extensions to: \textit{search over candidate output sequences}, \textit{curriculum learning} and \textit{professor forcing} \parencite{goodfellow2016deep, williams1989algorithm}.
+
+When using curriculum learning, at each step the source of input, i.e., whether it is the ground truth or the output of the previous timestep, to the next time step is chosen randomly \parencite{bengio2015scheduled}. This curriculum anneals over time, starting at teacher forced learning only (i.e., al inputs are ground truth tokens) at gradually transitioning to using predicted inputs. Inverse sigmoid decay schedule for the probability of the coin flip determining where the next input token come from was shown to yield best results on the MAS COCO image captioning task.
+
+When using professor forcing, the discrepancey between the training and inference performance is addressed by minimizing the discrepancy between the teacher forced and auto-regressive sampling behaviour, i.e., by making the distribution over sequences during training maximally similar to the target distribution \parencite{lamb2016professor}. This is achieved by training the model as a Generative Adversarial Network (GAN). More specifically, a second recurrent network---a biderectional RNN---  is introduced additionally to the RNN generating the captions. Due to the additional overhead for training an image captioner with this approach, exploring the effects of such pretraining on the downstream reference game is left for future work.
+
+For conducting the experiments in this thesis, speakers pretrained with different following approaches are considered: pure teacher forcing pretraining, constant 0.5 rate teacher forcing, linear adaptive teacher forcing, scheduled sampling (with pure decoding, k = 30, ?) na topk sampling with a tenmperature of 2 (replicating \cite{lazaridou2020multi}). \pt{For details of selecting the final pretrained speaker, see XY. }
+
+\subsection{Evaluation Metrics}
+An important yet non-trivial aspect of developing image captioning systems is their evaluation. Image captioning has been considered difficult to evaluate because for a given input image, several output captions might be equally suitable \pt{REF. Maybe example}. Therefore, usually a suite of evaluation metrics is used for evaluation. This work employs the merics proposed for the MS COCO dataset \parencite{chen2015microsoft}: BLEU, ROUGE, METEOR and CIDEr scores. Short conceptual summary. The score are discussed more formally in e. g., \cite{chen2015microsoft}...\footnote{The implementation of these metrics in Python provided by \url{https://github.com/daqingliu/coco-caption} is used in the present experiments.}    
+
+\section{Reinforcement Learning}
+
+\subsection{Introduction}
+``Reinforcement learning is a computational approach to understanding and automating goal-directed learning and decision-making'' (s.15, \cite{sutton2018reinforcement}).
+
+``The reinforcement learning problem is meant to be a straightforward framing of the problem of learning from interaction to achieve a goal. The learner and decision-maker is called the agent. [...] These interact continually, the agent selecting actions and the environment responding to those actions and presenting new situations to the agent.'' (p.53). A particular task is defined in terms of a complete definition of the environment, representing a particular instance of reinforcement learning (p. 54).
+
+A natural choice for training artificial agents to complete certain tasks like communicative tasks is reinforcement learning \pt{ref and refine}. 
+Reinforcement learning can be defined as learning the mapping from situations, represented as \textit{environments}, to optimal \textit{actions} that agent may choose in order to achieve the task goal, while maximizing the reward signal \parencite{sutton2018reinforcement}. Next to supervised and unsupervised learning, it represents one of three major learning paradigms in machine learning. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\linewidth]{images/rl_intro.png}
+	\caption{Interaction the environment with the agent via states, actions and rewards \parencite{sutton2018reinforcement}.}
+	\label{fig:rl}
+\end{figure}
+
+\pt{Definitions of: reward, environment, agents, actions, states, policy, value function, if necessary, q-learning maybe. An optiional model of the environment may also exist. }
+\begin{itemize}
+	\item agent: learner and decision maker in the interaction who tries to achieve a goal for a certain task.
+	\item the setting in which the agent's interactions are situates, everything outside of the agent itself is the \textit{environment}.
+	\item policy: the agent's learned mapping from environment states to actions within the environment 
+	\item reward signal: ``defines the goal in a reinforcement learning problem'' (p. 7, \cite{sutton2018reinforcement}) which is made up from single \textit{rewards} the agent receives at each timestep of the decision process. Improtantly, the agents' goal is to maximize the sumn of the rewards over the task completion.
+	\item value function: the expected total reward for agents starting the actions at the given state. These are adapted and reestimated based on observed action and reward sequences of the agents over their lifetime. 
+\end{itemize}
+
+Situations modelled by reinforcement learning are decision making sequences; such sequences are typically and straightforwardly formalized as Markov decision processes (MDPs), framing the problem of interactively learning to achieve a goal from interaction (p. 47). Here it is assumed that the interaction takes place over discrete timesteps $t = 0, 1,2 ...$. At each step t, the state $S_t \in S$ in which the agent is in can be considered as her current representation of the environment, where $S$ is the set of all possible states. Given the state, the agent selects an action $A_t \in A(s)$, where $A(s)$ denotes the set of all actions available in state t. At the next timestep the agent receives a reward $R_{t+1} \in R$ for the action $A_t$. These iterations can be formalized as finite MDPs if they consist of an A, S and R with a finite number of elements. In this case, the probability p for a particular state s' and reward r' to occur at time t is conditional on the previous state and action. A typical assumption made in the RL literature applied to multi-agent communication is that the states have the \textit{Markov property}, i.e., that they encode information from all previous interaction steps. Given p. one can compute state transition probabilities, and most ciritically, the expected rewards for given state and action combinations. The latter is especially important in order to estimate the return $G_t$ and thus formally represent the objective of learning, namely maximizing the return. In the present work, the following simple definition of $G_t$ is assumed: 
+$$G_t = R_{t+1} + R_{t+2} + ... + R_T$$ where $T$ is the final step of the action sequence. This sequence as a natural iteration of interactions is also called \textit{episodes}.  Different return formalizations, e.g., using expected discounted returns is popular in other domain, but cannot really be applied in the present reference game since the environment (i.e., the reference game) only provides one reward per entire episode (i.e., entire message generation). 
+
+Another critical part of RL algorithms is the value function, describing how valuable it is with respect to the expected returnfor an agent to be in a given state. Since these values depend on the taken actions, the last critical component is the policy. ``A policy is a mapping from states to probabilities'' of taking avalibale action: $\pi(a | s)$ the describes the probability that the agents choses the actiona inthe state s.
+
+Action-value function? value function? necessary?
+
+Concrete specification and notation of actions, rewards, states and policy.
+
+(Discounted) rewards.
+
+Markov property.
+
+Markov decision processes.
+
+Value functions and optimal policies (up to p. 95).
+
+Transition to deep reinforcement learning \parencite{lecun2015deep}.
+
+\subsection{Deep Reinforcement Learning Methods}
+
+Deep Q-learning. 
+
+Actor-Critic.
+
+Policy-gradient method reinforce \parencite{williams1992simple, sutton2018reinforcement}. Mean baseline. 
