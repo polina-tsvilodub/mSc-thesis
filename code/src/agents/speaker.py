@@ -107,11 +107,11 @@ class DecoderRNN(nn.Module):
         raw_outputs = [] # for structural loss computation
         log_probs = []
         entropies = []
-        batch_size = 64#inputs[0].shape[0] # batch_size is 1 at inference, inputs shape : (1, 1, embed_size)
+        batch_size = inputs.shape[0] # batch_size is 1 at inference, inputs shape : (1, 1, embed_size)
         hidden = self.init_hidden(batch_size) # Get initial hidden state of the LSTM
         softmax = nn.Softmax(dim=-1)
         # create initial caption input: "START"
-        caption = torch.tensor([0, 0]).repeat(64, 1) # two 0s since we cut off last token in forward step, so that we actually keep one
+        caption = torch.tensor([0, 0]).repeat(batch_size, 1) # two 0s since we cut off last token in forward step, so that we actually keep one
         # make initial forward step, get output of shape (batch_size, 1, vocab_size)
         init_hiddens = self.init_hidden(batch_size)
         ####
