@@ -126,8 +126,11 @@ def get_loader(transform,
     
 
     if mode == 'train':
+        if pairs != "similar":
         # Randomly sample a caption length, and sample indices with that length.
-        indices = dataset.get_func_train_indices()
+            indices = dataset.get_func_train_indices()
+        else:
+            indices = dataset.get_func_similar_train_indices()
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.
@@ -139,8 +142,11 @@ def get_loader(transform,
                                                                 batch_size=dataset.batch_size,
                                                                 drop_last=False))
     elif mode == 'val':
-        # Randomly sample a caption length, and sample indices with that length.
-        indices = dataset.get_func_train_indices()
+        if pairs != "similar":
+            # Randomly sample a caption length, and sample indices with that length.
+            indices = dataset.get_func_train_indices()
+        else:
+            indices = dataset.get_func_similar_train_indices()
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.

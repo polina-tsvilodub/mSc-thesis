@@ -37,7 +37,7 @@ class COCOCaptionsDataset(Dataset):
             embedded_imgs,
             dataset_path,
             num_imgs,
-            pairs,
+            pairs="random",
             vocab_from_pretrained=False,
             max_sequence_length=0,
             categorize_imgs=False, # flag whether the images need to be sorted
@@ -52,20 +52,21 @@ class COCOCaptionsDataset(Dataset):
         self.pad_token=pad_token
         self.embedded_imgs=embedded_imgs
         self.tokenizer = get_tokenizer("basic_english")
+        self.pairs = pairs
 
         # read categories2img
-        # with open("../../../data/categories_to_image_IDs_train_filtered.json", "r") as fp:
-        #     f = json.load(fp)
-        # self.categories2image = f    
-        # self.category_ids = list(f.keys())
-        # # read img2categories
-        # with open("../../../data/imageIDs_to_categories_train_filtered.json", "r") as fp:
-        #     f = json.load(fp)
-        # self.imgs2cats = f
-        # # read imgID to annIDs mapping file
-        # with open("imgID2annID.json", "r") as fp:
-        #     f = json.load(fp)
-        # self.imgID2annID = f
+        with open("./../../data/categories_to_image_IDs_train_filtered.json", "r") as fp:
+            f = json.load(fp)
+        self.categories2image = f    
+        self.category_ids = list(f.keys())
+        # read img2categories
+        with open("./../../data/imageIDs_to_categories_train_filtered.json", "r") as fp:
+            f = json.load(fp)
+        self.imgs2cats = f
+        # read imgID to annIDs mapping file
+        with open("imgID2annID.json", "r") as fp:
+            f = json.load(fp)
+        self.imgID2annID = f
         
         # some distinctions below for Train and test mode
         if mode == "train":
@@ -91,9 +92,9 @@ class COCOCaptionsDataset(Dataset):
                 else:
                     self.ids = torch.load(dataset_path).tolist()
             else:
-                self.ids = torch.load("../train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+                self.ids = torch.load("train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             # set the image IDs for validation during early stopping to avoid overlapping images
-            self.ids_val = torch.load("../train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
+            self.ids_val = torch.load("train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
             all_tokens = [tokenizer(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))] 
@@ -105,7 +106,7 @@ class COCOCaptionsDataset(Dataset):
             # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_pretrainGrid_decr05.pt")
             # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            # torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_scheduled_sampling_inverse_sigma_ExpDecoding_k150.pt")
+            torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_cont.pt")
 
         elif mode == "val":
             with open("notebooks/imgID2annID_val.json", "r") as fp:
@@ -226,11 +227,12 @@ class COCOCaptionsDataset(Dataset):
                 List of tuples of target and distractor indices, each for a single reference game iteration.
         """
         
-        sel_length_t = np.random.choice(self.caption_lengths)
+        # sel_length_t = np.random.choice(self.caption_lengths)
 
-        all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
+        # all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
 
-        indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
+        # indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
+        indices_t = list(np.random.choice(np.arange(len(self.ids)), size=self.batch_size))
         # retrieve image ids of sampled ids to make sure we don't get target distractor pairs
         # consisiting of same images
         imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
@@ -265,24 +267,11 @@ class COCOCaptionsDataset(Dataset):
         # check that for each pair, the categories overlap between target and distractor matches my criteria
         for tup in inds_tuples:
             common_cats = list(set.intersection(set(self.imgs2cats[str(tup[0])]['categories']), set(self.imgs2cats[str(tup[1])]['categories'])))
-            print("common cats before while: ", common_cats)
-            print("Len common cats: ", len(common_cats))
-            print("target cats: ", set(self.imgs2cats[str(tup[0])]['categories']))
-            print("Len ", len(set(self.imgs2cats[str(tup[0])]['categories'])))
-            print("dist cats: ", set(self.imgs2cats[str(tup[1])]['categories']))
             while len(common_cats) < 3 and len(common_cats) != len(self.imgs2cats[str(tup[0])]['categories']):
-                print("common cats in while: ", common_cats)
                 tup = tuple([tup[0], np.random.choice(possible_inds_dist, size=1).item()])
                 common_cats = list(set.intersection(set(self.imgs2cats[str(tup[0])]['categories']), set(self.imgs2cats[str(tup[1])]['categories'])))
-                # sample a new target dist pair
-                
-#         all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
-
-#         indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
-#         possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t]
-#         indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
-        
-        return inds_tuples#list(zip(indices_t, indices_d))
+                        
+        return inds_tuples
 
 
     def collate_distractors(self, batch):
@@ -297,15 +286,16 @@ class COCOCaptionsDataset(Dataset):
             target_caption.append(targ_c)
             distractor_caps.append(dist)
         
+        targets_list = pad_sequence(target_caption, batch_first=True, padding_value=self.vocab(self.vocab.pad_word))
         text_list = pad_sequence(distractor_caps, batch_first=True, padding_value=self.vocab(self.vocab.pad_word))
         
         target_image = torch.stack(target_image)
         distractor_image = torch.stack(distractor_image)
         target_features = torch.stack(target_features)
         distractor_features = torch.stack(distractor_features)
-        target_caption = torch.stack(target_caption)
+        # target_caption = torch.stack(target_caption)
 
-        return target_image, distractor_image, target_features, distractor_features, target_caption, text_list
+        return target_image, distractor_image, target_features, distractor_features, targets_list, text_list
 
 class threeDshapes_Dataset(Dataset):
     """
@@ -345,6 +335,17 @@ class threeDshapes_Dataset(Dataset):
         self.pad_token=pad_token
         self.embedded_imgs=embedded_imgs
         self.tokenizer = get_tokenizer("basic_english")
+        # categories with respective possible values, for similar pairs expt
+        self.categories = {
+            'floor_hue': [0,0.1,0.2,0.30000000000000004,0.4,0.5,0.6000000000000001,0.7000000000000001,0.8,0.9],
+            'wall_hue': [0,0.1,0.2,0.30000000000000004,0.4,0.5,0.6000000000000001,0.7000000000000001,0.8,0.9], 
+            'object_hue': [0,0.1,0.2,0.30000000000000004,0.4,0.5,0.6000000000000001,0.7000000000000001,0.8,0.9],
+            'scale': [0.75,0.8214285714285714,0.8928571428571428,0.9642857142857143,1.0357142857142856,1.1071428571428572,1.1785714285714286,1.25], 
+            'shape': [0,1,2,3], 
+            'orientation': [-30,-25.714285714285715,-21.42857142857143,-17.142857142857142,-12.857142857142858,-8.571428571428573,-4.285714285714285,0, 4.285714285714285,8.57142857142857,12.857142857142854,17.14285714285714,21.42857142857143,25.714285714285715,30],
+        }
+        with open("notebooks/categories2imgIDs_3dshapes_fixed.json", "r") as fp:
+            self.cats2imgIDs = json.load(fp)
 
         if mode == "train":
             self.image_dir = os.path.join(download_dir, "3dshapes_np.npy") # download_dir needs to be data/train/ then 
@@ -492,124 +493,40 @@ class threeDshapes_Dataset(Dataset):
 
         return target_image, distractor_image, target_features, distractor_features, target_caption, text_list
 
-def _sort_images_by_category(download_dir, filename, is_train):
-    """
-    Sort image filenames into a dictionary with supercategory IDs as keys.
+    def get_func_similar_train_indices(self):
+            """
+            Simple POC function returning two lists on indices for the functional training. 
+            Returns a list of inidces for targets and a list f indices for distractors. 
+            Captions are of same lengths for targets and distractors (will be optimized).
 
-    Arguments:
-    --------
-        filename: str (instances file)
-            Path to file containing image filenames and category annotations
-    Returns:
-    ------
-        categories: dict
-            Dict of form {category_id : [image file names] }
-    """
-    # check if json file with this info laready exists, otherwise export
-    if os.path.exists("../../data/categories_to_image_paths.json"):
-        print("Category to image IDs json file already exists!")
-        # read existing file
-        with open("../../data/categories_to_image_paths.json", "r", encoding="utf-8") as fp:
-            categories = json.load(fp)
-        return categories
-    else:    
-        # load instances file
-        if is_train:
-            path = os.path.join(download_dir, "annotations", "".join([filename, "_train2014.json"]))
-        else: 
-            path = os.path.join(download_dir, "annotations", "".join([filename, "_val2014.json"]))  
+            Returns:
+            -------
+                list: (int, int)
+                    List of tuples of target and distractor indices, each for a single reference game iteration.
+            """
 
-        # Load the json file.
-        with open(path, "r", encoding="utf-8") as file:
-            categories_raw = json.load(file)
-            print("Loading categories for ", path)
-    
-        # load annotations section
-        # TODO check how to map IDs to names elsewhere
-        # category_names_ids = [(cat["id"], cat["name"]) for cat in categories_raw["categories"]]
-        category_ids = [cat["id"] for cat in categories_raw["categories"]]
-        print("List of category IDs: ", category_ids)
-        # create empty dict for records
-        categories = dict()
-        # create dictinary with all the keys
-        for i in category_ids:
-            categories[i] = list()
-        # build helper image dictionary with image IDs as keys
-        images_raw = categories_raw["images"]
-        image_dict = dict()
-        for image in images_raw:
-            image_dict[image["id"]] = image 
+            # TODO checks from construction of pairs w all captions per iamge need to be added
 
-        # assign image filenames to the category keys
-        # get image IDs from annotation entries
-        annotation_ids = categories_raw["annotations"] 
-        print("Number of records: ", len(annotation_ids))  
-        for ann in annotation_ids:
-            # get the image id of the entry
-            image = ann["image_id"]
-            # get the category id of the entry
-            category = ann["category_id"]
-            image_path = image_dict[image]["file_name"]
-            # append imagepath to respective category
-            categories[category].append(image_path)
-            
-        print("Dumping json ...")
+            # select at random 3 categories along which the image should be constant
+            sel_categories = np.random.choice(list(self.categories.keys()), size=3, replace=False)
+            # create a placeholder for the chosen values, just in case
+            sel_values = []
+            # select the indices where the three categories + values have desired values
+            # create a placeholder for intersecting the indices for that 
+            possible_inds = []
+            for i, c in enumerate(sel_categories):
+                val = np.random.choice(self.categories[c])
+                sel_values.append(val)
+                if i == 0:
+                    possible_inds = self.cats2imgIDs[c][str(val)]
+                else:
+                    possible_inds = list(set.intersection(set(self.cats2imgIDs[c][str(val)]), set(possible_inds)))
+                
+            # sample a batch, create tuples
+            batch = list(np.random.choice(possible_inds, size=2*self.batch_size))
+            indices_t = batch[:self.batch_size]
+            indices_d = batch[self.batch_size:]
 
-        with open("../../data/categories_to_image_paths.json", "w") as fp:
-            json.dump(categories, fp)
+            inds_tuples = list(zip(indices_t, indices_d))
 
-        return categories    
-
-def _get_image_categories(download_dir, is_train):
-    """
-    Function mapping each image ID to all category annotations.
-    """
-    # check is file already exists
-    if os.path.exists("../../data/imageIDs_to_categories.json"):
-        print("Image IDs to category IDs json file already exists!")
-        # read existing file
-        with open("../../data/imageIDs_to_categories.json", "r", encoding="utf-8") as fp:
-            images = json.load(fp)
-        return images
-    else:  
-        if is_train: 
-            file_path = os.path.join(download_dir, "annotations", "instances_train2014.json")
-        else:
-            file_path = os.path.join(download_dir, "annotations", "instances_val2014.json")    
-        # load annotations file
-        with open(file_path) as f:
-            categories = json.load(f)
-        # load categories to supercategories mapping file
-        with open("../../data/categories_to_supercategories.json", "r") as cats:
-            supercats = json.load(cats)    
-        # create dictionary with image ids as keys
-        images = dict()
-        images_raw = categories["images"]
-        for image in images_raw:
-            images[image["id"]] = dict()
-            images[image["id"]]["categories"] = list()
-            images[image["id"]]["supercategories"] = list()
-            
-        for ann in categories["annotations"]:
-            # check if category already included
-            if ann["category_id"] in images[ann["image_id"]]["categories"]:
-                pass
-            else:
-                images[ann["image_id"]]["categories"].append(ann["category_id"])
-            # add supercategories
-            supercat = supercats[str(ann["category_id"])]
-            if supercat in images[ann["image_id"]]["supercategories"]:
-                pass
-            else:
-                images[ann["image_id"]]["supercategories"].append(supercat)
-            # check if the image is too crowded to be used in the within-category training
-            if len(images[ann["image_id"]]["categories"]) > 6:
-                images[ann["image_id"]]["has_many_categories"] = True 
-            else:
-                images[ann["image_id"]]["has_many_categories"] = False 
-
-        # write out json
-        with open("../../data/imageIDs_to_categories.json", "w") as fp:
-            json.dump(images, fp)
-        return images
-        
+            return inds_tuples
