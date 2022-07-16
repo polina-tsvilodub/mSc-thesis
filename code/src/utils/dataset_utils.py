@@ -78,7 +78,10 @@ class COCOCaptionsDataset(Dataset):
             # read imd2annID file. select N images, get all ann IDs => ids
             with open("imgID2annID.json", "r") as fp:
                 f = json.load(fp)
-            imgIDs4train = list(f.keys())[:30000] # 
+            if pairs == "similar":
+                imgIDs4train = torch.load("../../data/ref_game_similar_img_IDs_filtered.pt")[:30000] 
+            else:
+                imgIDs4train = list(f.keys())[:30000] # 
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             shuffle(_ids)
             _ann_ids_flat = [i for lst in _ids for i in lst[0]]
@@ -215,7 +218,7 @@ class COCOCaptionsDataset(Dataset):
             return orig_image, image
         
 
-    def get_func_train_indices(self):
+    def get_func_train_indices(self, i_step):
         """
         Simple POC function returning two lists on indices for the functional training. 
         Returns a list of inidces for targets and a list f indices for distractors. 
@@ -232,12 +235,14 @@ class COCOCaptionsDataset(Dataset):
         # all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
 
         # indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
-        indices_t = list(np.random.choice(np.arange(len(self.ids)), size=self.batch_size))
+        # indices_t = list(np.random.choice(np.arange(len(self.ids)), size=self.batch_size))
+        indices_t = list(range((i_step-1)*self.batch_size, i_step*self.batch_size))
+        print("Indices_t ", indices_t)
         # retrieve image ids of sampled ids to make sure we don't get target distractor pairs
         # consisiting of same images
         imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
         possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t and self._img_ids_flat[x] not in imgIDs_t]
-        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
+        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size, replace=False))
         
         return list(zip(indices_t, indices_d))
 
@@ -253,24 +258,42 @@ class COCOCaptionsDataset(Dataset):
                 List of tuples of target and distractor indices, each for a single reference game iteration.
         """
 
-        # TODO checks from construction of pairs w all captions per iamge need to be added
-      
-        # select at random a category of interest
-        # the idea is to have by-batch catrgorization
-        sel_category = np.random.choice(self.category_ids)
-        all_indices_cat = self.categories2image[sel_category]
-        # sample a batch, create tuples
-        indices_t = list(np.random.choice(all_indices_cat, size=self.batch_size))
-        possible_inds_dist = [x for x in all_indices_cat if x not in indices_t]
-        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size))
-        inds_tuples = list(zip(indices_t, indices_d))
-        # check that for each pair, the categories overlap between target and distractor matches my criteria
-        for tup in inds_tuples:
-            common_cats = list(set.intersection(set(self.imgs2cats[str(tup[0])]['categories']), set(self.imgs2cats[str(tup[1])]['categories'])))
-            while len(common_cats) < 3 and len(common_cats) != len(self.imgs2cats[str(tup[0])]['categories']):
-                tup = tuple([tup[0], np.random.choice(possible_inds_dist, size=1).item()])
-                common_cats = list(set.intersection(set(self.imgs2cats[str(tup[0])]['categories']), set(self.imgs2cats[str(tup[1])]['categories'])))
-                        
+        # get batch indices
+        indices_t = list(range((i_step-1)*self.batch_size, i_step*self.batch_size))
+        # for each image, get its categories and iteratively choose a suitable distractor
+        targets_categories = [self.imgs2cats[str(self._img_ids_flat[i])] for i in indices_t]
+        distractor_inds = []
+        distractor_ann_inds = []
+        
+        for num, c in enumerate(targets_categories):
+            print("Target categories: ", c)
+            # align the target and distractor categories 
+            possible_inds = []
+            for i, c_t in enumerate(c["categories"]):
+                print("I, c_t ", i, c_t)
+                if i == 0:
+                    possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(self._img_ids_flat)))
+                else:
+                    possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(possible_inds)))
+            
+            print("num of possible inds ", len(possible_inds))
+            dist_ind = possible_inds[0]
+            print("Dist ind ", dist_ind)
+            j = 1
+            while dist_ind == indices_t[num]:
+                dist_ind = possible_inds[j]
+                j += 1 # TODO check it does not get out of range
+            distractor_inds.append(dist_ind)   
+            print("Dist ind ", dist_ind)
+            # convert distractor image id to index of the corresponding annotation ID
+            distractor_ann_ind = np.where([self._img_ids_flat[i] == dist_ind for i in range(len(self._img_ids_flat))])[0]
+            print("distractor ann ind ", distractor_ann_ind)
+            distractor_ann_inds.append(distractor_ann_ind[0])
+        print("Distractor inds final ", distractor_inds)
+        print("Distractor ann inds final ", distractor_ann_inds)
+    
+        inds_tuples = list(zip(indices_t, distractor_ann_inds))
+        print("inds_tuples ", inds_tuples)
         return inds_tuples
 
 
@@ -344,12 +367,15 @@ class threeDshapes_Dataset(Dataset):
             'shape': [0,1,2,3], 
             'orientation': [-30,-25.714285714285715,-21.42857142857143,-17.142857142857142,-12.857142857142858,-8.571428571428573,-4.285714285714285,0, 4.285714285714285,8.57142857142857,12.857142857142854,17.14285714285714,21.42857142857143,25.714285714285715,30],
         }
-        with open("notebooks/categories2imgIDs_3dshapes_fixed.json", "r") as fp:
+        with open("notebooks/categories2imgIDs_3dshapes_fixed_float_train.json", "r") as fp:
             self.cats2imgIDs = json.load(fp)
 
         if mode == "train":
             self.image_dir = os.path.join(download_dir, "3dshapes_np.npy") # download_dir needs to be data/train/ then 
             self.images = np.load(self.image_dir) # ["images"] # os.path.join(download_dir, file)
+            self.numeric_labels = np.load(
+                os.path.join(download_dir, "3dshapes_labels_np.npy")
+            )
             with open("../../data/3dshapes_captions_fixed.json", "r") as fp:
                 self.labels = json.load(fp)
             with open("../../data/3dshapes_captions_short.json", "r") as fp:
@@ -505,28 +531,46 @@ class threeDshapes_Dataset(Dataset):
                     List of tuples of target and distractor indices, each for a single reference game iteration.
             """
 
-            # TODO checks from construction of pairs w all captions per iamge need to be added
-
-            # select at random 3 categories along which the image should be constant
+            # get ann / img ID slice
+            target_img_ids = self._img_ids_flat[(i_step-1)*self.batch_size : i_step*self.batch_size]
+            target_labels = [self.numeric_labels[int(i)] for i in target_img_ids]
+            
+            # select at random 3 categories along which the image should be constant in this batch
             sel_categories = np.random.choice(list(self.categories.keys()), size=3, replace=False)
-            # create a placeholder for the chosen values, just in case
-            sel_values = []
+            sel_categories_inds = [list(self.categories.keys()).index(c) for c in sel_categories]
+            print("Selected categories: ", sel_categories)
+            # create a container for the distractor indices
+            distractor_inds = []
+            
             # select the indices where the three categories + values have desired values
-            # create a placeholder for intersecting the indices for that 
-            possible_inds = []
-            for i, c in enumerate(sel_categories):
-                val = np.random.choice(self.categories[c])
-                sel_values.append(val)
-                if i == 0:
-                    possible_inds = self.cats2imgIDs[c][str(val)]
-                else:
-                    possible_inds = list(set.intersection(set(self.cats2imgIDs[c][str(val)]), set(possible_inds)))
-                
-            # sample a batch, create tuples
-            batch = list(np.random.choice(possible_inds, size=2*self.batch_size))
-            indices_t = batch[:self.batch_size]
-            indices_d = batch[self.batch_size:]
-
-            inds_tuples = list(zip(indices_t, indices_d))
-
+            
+            # iterate over each sample to find the right distractor
+            for lbl in target_labels:
+                print("Lbl ", lbl)
+                # create a placeholder for intersecting the indices for that 
+                possible_inds = []
+                # get values of sampled fixed categories and matching distractor indices
+                for i, c_i in enumerate(list(zip(sel_categories, sel_categories_inds))):
+                    print("Ind retrieval loop for lbl: ", i, c_i)
+                    if i == 0:
+                        possible_inds = self.cats2imgIDs[c_i[0]][str(lbl[c_i[1]])]
+                    else:
+                        possible_inds = list(set.intersection(set(self.cats2imgIDs[c_i[0]][str(lbl[c_i[1]])]), set(possible_inds)))
+                # get one distractor 
+                distractor_img_ind = possible_inds[0]
+                print("distractor_img_ind", distractor_img_ind)
+                # convert retrieved distractor image index into distractor annotation index
+                distractor_ann_ind = np.where([self._img_ids_flat[i] == str(distractor_img_ind) for i in range(len(self._img_ids_flat))])[0]
+                print("distractor_ann_id", distractor_ann_ind)
+                distractor_inds.append(int(distractor_ann_ind[0]))
+            
+                            
+            print("Selected cats: ", sel_categories)
+            print("Number of distractor inds: ", len(distractor_inds))
+            
+            print("target img ind: ", target_img_ids)
+            inds_tuples = list(zip(list(range((i_step-1)*self.batch_size, i_step*self.batch_size)), distractor_inds)) #list(zip(indices_t, indices_d))
+            print("tuples: ", inds_tuples)
+            # double check that target and distractor aren't the same image
+            
             return inds_tuples
