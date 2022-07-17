@@ -13,6 +13,7 @@ import random
 def validate_model(
     data_loader_val,
     decoder,
+    drift_meter,
 ):
     """
     Utility function for computing the validation performance of the speaker model while pre-training.
@@ -23,19 +24,44 @@ def validate_model(
         Validation data loader for images not used during training.
     decoder: 
         Trained decoder RNN to be evaluated.
-
+    drift_meter:
+        Instance of drift metrics collector class.
     Returns:
     -------
     val_loss: float
         Average validation loss over the evaluation images.
+    val_ppl_out: float
+        Average validation PPL over the evaluation images. 
+    val_losses: list[float]
+        By-batch validation losses. 
+    val_ppl: list[float]
+        By-batch validation PPLs. 
+    eval_steps: list[int]
+        Validation run steps.
+    structural_drifts: list[float]
+        List of by-batch structural drifts of the predicted captions. 
+    structural_drifts_true: list[float]
+        List of by-batch structural drifts of the ground truth captions.
     """
+    # containers for tracking values
+    eval_steps = []
+    structural_drifts_true = []
+    structural_drifts = []
+    val_ppl = []
+    val_losses = []
+    image_similarities_val = []
+
     # init params
     val_running_loss = 0.0
+    val_running_ppl = 0.0
     counter = 0
     embedded_imgs = torch.load("./notebooks/resnet_pretrain_embedded_val_imgs.pt")
     total_steps = math.floor(len(data_loader_val.dataset.caption_lengths) / data_loader_val.batch_sampler.batch_size)
     print("Val total steps: ", total_steps+1)
     criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
+    
+    init_hidden = decoder.init_hidden(data_loader_val.batch_sampler.batch_size)
+    softmax = nn.Softmax(dim=-1)
 
     decoder.eval()
 
@@ -60,22 +86,48 @@ def validate_model(
             target_captions = target_captions.to(device)
 
             # compute val predictions and loss
-            both_images = torch.cat((target_features, distractor_features), dim=-1)
-            outputs = decoder(both_images, target_captions)
+            both_images = torch.cat((target_features.unsqueeze(1), distractor_features.unsqueeze(1)), dim=1) 
+            outputs, h = decoder(both_images, target_captions, init_hidden)
             
             # The size of the vocabulary.
             vocab_size = len(data_loader_val.dataset.vocab)
 
             # Calculate the batch loss.
-            loss = criterion(outputs.contiguous().view(-1, vocab_size), target_captions[:, 1:].reshape(-1))  
+            loss = criterion(outputs.transpose(1,2), target_captions[:, 1:])   
+            ppl = torch.exp(loss).item()
+            val_running_ppl += ppl
+            val_ppl.append(ppl)
+            val_losses.append(loss.item())
+
+            # calculate metrics
+            # also compute structural drift, for potential comparison to reference game setting
+            # structural drift under a pretrained LM
+            # decode caption to natural language for that
+            eval_steps.append(i)
+            outputs_ind = softmax(outputs)
+            max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
+            nl_caption = [[data_loader_val.dataset.vocab.idx2word[w.item()] for w in s] for s in cat_samples]
+            # nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in cat_samples]
+            nl_caption = [" ".join(nl_cap) for nl_cap in nl_caption] # " ".join(nl_caption)
+            structural_drift = drift_meter.structural_drift(nl_caption)
+            structural_drifts.append(structural_drift.item())
+            # also compute this for ground truth caption, as a reference value
+            # caption_ind = softmax(targets_captions[i])
+            nl_true_caption = [[data_loader_val.dataset.vocab.idx2word[w.item()] for w in s] for s in target_captions] #[data_loader.dataset.vocab.idx2word[w.item()] for w in target_captions[i]]
+            nl_true_caption = [" ".join(nl_true_cap) for nl_true_cap in nl_true_caption] #" ".join(nl_true_caption)
+            structural_drift_true = drift_meter.structural_drift(nl_true_caption)
+            structural_drifts_true.append(structural_drift_true.item())
 
             val_running_loss += loss.item()
             
         
         val_loss = val_running_loss / counter
+        val_ppl_out = val_running_ppl / counter 
         print("Val loss: ", val_loss)
+        print("Val PPL: ", val_ppl_out)
             
-        return val_loss
+        return val_loss, val_ppl_out, val_losses, val_ppl, eval_steps,\
+            structural_drifts, structural_drifts_true
 
 
 def pretrain_speaker(
@@ -91,6 +143,9 @@ def pretrain_speaker(
     weights_path,
     print_every,
     save_every,
+    train_losses_file,
+    train_metrics_file,
+    val_metrics_file,
 ):
     """
     Training loop for pretraining the speaker model.
@@ -125,22 +180,19 @@ def pretrain_speaker(
 
     # Open the training log file.
     f = open(log_file, 'w')
-    csv_out = "../../data/final/losses_final_pretrained_speaker_coco_4000vocab_tf_desc05_padding_pureDecoding_"
-    val_csv_out = "../../data/final/val_final_pretrained_speaker_coco_4000vocab_tf_desc05_padding_pureDecoding_"
-    csv_metrics = "../../data/final/metrics_final_pretrained_speaker_coco_4000vocab_tf_desc05_padding_pureDecoding_"
+    csv_out = train_losses_file 
+    val_csv_out = val_metrics_file  
+    csv_metrics = train_metrics_file 
     
     speaker_losses=[]
     perplexities = []
     image_similarities = []
     steps = []
-    val_losses, val_steps = [], []
-    eval_steps = []
+    val_losses, val_ppls, val_steps = [], [], []
+    val_losses_avg, val_ppls_avg = [], []
+    eval_steps_list = []
     structural_drifts_true = []
     structural_drifts = []
-    semantic_drifts = []
-    semantic_drifts_true = []
-    discrete_overlaps = []
-    cont_overlaps = []
     train_type = []
     forcing_rate = []
     sanity_check_inds = []
@@ -274,10 +326,10 @@ def pretrain_speaker(
             optimizer.step()
                 
             # Get training statistics.
-            stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i_step, total_steps, loss.item(), np.exp(loss.item()))
+            stats = 'Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f' % (epoch, num_epochs, i, total_steps, loss.item(), np.exp(loss.item()))
             
             speaker_losses.append(loss.item())
-            steps.append(i_step)
+            steps.append(i)
             perplexities.append(torch.exp(loss).item())
         
             # Print training statistics (on same line).
@@ -288,29 +340,11 @@ def pretrain_speaker(
             f.write(stats + '\n')
             f.flush()
             
+           
             # Print training statistics (on different line).
             if i % 500 == 0:
                 print('\r' + stats)
-                decoder.eval()
-                init_hidden = decoder.init_hidden(1)
-                # also compute structural drift, for potential comparison to reference game setting
-                for i in range(outputs.shape[0]): # iterate over sentences in batch
-                    # structural drift under a pretrained LM
-                    # decode caption to natural language for that
-                    eval_steps.append(i_step)
-                    outputs_ind = softmax(outputs[i])
-                    max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
-
-                    nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in cat_samples]
-                    nl_caption = " ".join(nl_caption)
-                    structural_drift = drift_meter.structural_drift(nl_caption)
-                    structural_drifts.append(structural_drift)
-                    # also compute this for ground truth caption, as a reference value
-                    # caption_ind = softmax(targets_captions[i])
-                    nl_true_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in target_captions[i]]
-                    nl_true_caption = " ".join(nl_true_caption)
-                    structural_drift_true = drift_meter.structural_drift(nl_true_caption)
-                    structural_drifts_true.append(structural_drift_true)
+                
 
                     
         # Save the weights.
@@ -321,18 +355,27 @@ def pretrain_speaker(
             use_teacher_forcing_rate = use_teacher_forcing_rate * 0.5
             # compute validation loss
             with torch.no_grad():
-                val_loss = validate_model(
+                val_loss, val_ppl_out, val_losses_list, val_ppls_list, eval_steps,\
+                    str_drifts, str_drifts_true = validate_model(
                     data_loader_val,
                     decoder,
+                    drift_meter,
                 )     
                 
-                val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i_step, total_steps, val_loss)
+                val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i, total_steps, val_loss)
                 print(val_stats)
                 f.write(val_stats + '\n')
                 f.flush()   
                 
-                val_losses.append(val_loss)
-                val_steps.append(i_step)
+                val_losses.extend(val_losses_list)
+                val_ppls.extend(val_ppls_list)
+                eval_steps_list.extend(eval_steps)
+                structural_drifts.extend(str_drifts)
+                structural_drifts_true.extend(str_drifts_true)
+
+                val_losses_avg.append(val_loss)
+                val_ppls_avg.append(val_ppl_out)
+                val_steps.append(i)
                 # update stooper
                 early_stopper(val_loss)
                 # check if we want to break
@@ -343,27 +386,30 @@ def pretrain_speaker(
                     break
 
         # save the training metrics
-        df_out = pd.DataFrame({
-            "steps": steps,
-            "losses": speaker_losses,
-            "perplexities": perplexities,
-            "train_type": train_type,
-            "forcing_rate": forcing_rate,
-        })
-        df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
+            df_out = pd.DataFrame({
+                "steps": steps,
+                "losses": speaker_losses,
+                "perplexities": perplexities,
+                "train_type": train_type,
+                "forcing_rate": forcing_rate,
+            })
+            df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False, mode = "a" )
 
-        df_val_out = pd.DataFrame({
-            "steps": val_steps,
-            "val_losses": val_losses
-        })
-        df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False)
+            df_val_out = pd.DataFrame({
+                "steps": eval_steps,
+                "val_losses": val_losses,
+                "val_ppls": val_ppls,
+                "structural_drift_true": structural_drifts_true,
+                "structural_drift_pred": structural_drifts,
+            })
+            df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False, mode = "a")
 
-        metrics_out = pd.DataFrame({
-            "steps": eval_steps,
-            "structural_drift_true": structural_drifts_true,
-            "structural_drift_pred": structural_drifts,
-        })
-        metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
+            metrics_out = pd.DataFrame({
+                "steps": val_steps,
+                "val_losses_avg": val_losses_avg,
+                "val_ppls_avg": val_ppls_avg,
+            })
+            metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False, mode = "a")
 
         # also break the epochs 
         if early_stopper.early_stop:

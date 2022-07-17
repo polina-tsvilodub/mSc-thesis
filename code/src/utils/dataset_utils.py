@@ -11,9 +11,6 @@ from PIL import Image
 from tqdm import tqdm
 import h5py
 from torch.nn.utils.rnn import pad_sequence
-# build a batch generator which takes ones caption out of the five at random
-# TODO add a bool for whether the imgs should be sorted into categories
-# and if so, do that on the self.ids  
 
 class COCOCaptionsDataset(Dataset):
     """
@@ -40,7 +37,6 @@ class COCOCaptionsDataset(Dataset):
             pairs="random",
             vocab_from_pretrained=False,
             max_sequence_length=0,
-            categorize_imgs=False, # flag whether the images need to be sorted
         ):
         self.transform = img_transform
         self.mode = mode # train or test or val
@@ -85,7 +81,6 @@ class COCOCaptionsDataset(Dataset):
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             shuffle(_ids)
             _ann_ids_flat = [i for lst in _ids for i in lst[0]]
-            self._img_ids_flat = [i[1] for i in _ids for x in i[0]]
             
             ####
             # retrieve a subset of images for pretraining
@@ -96,6 +91,13 @@ class COCOCaptionsDataset(Dataset):
                     self.ids = torch.load(dataset_path).tolist()
             else:
                 self.ids = torch.load("train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+            
+            if dataset_path == "notebooks/val_split_IDs_from_COCO_train_tensor.pt":
+                self._img_ids_flat = [self.coco.loadAnns(i)[0]['image_id'] for i in self.ids]
+            else:   
+                self._img_ids_flat = [i[1] for i in _ids for x in i[0]]
+            
+
             # set the image IDs for validation during early stopping to avoid overlapping images
             self.ids_val = torch.load("train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
@@ -109,7 +111,7 @@ class COCOCaptionsDataset(Dataset):
             # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_pretrainGrid_decr05.pt")
             # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            torch.save(torch.tensor(self.ids), "train_logs/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_cont.pt")
+            torch.save(torch.tensor(self.ids), "train_logs/final/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_vocab4000_padding.pt")
 
         elif mode == "val":
             with open("notebooks/imgID2annID_val.json", "r") as fp:
@@ -237,7 +239,7 @@ class COCOCaptionsDataset(Dataset):
         # indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
         # indices_t = list(np.random.choice(np.arange(len(self.ids)), size=self.batch_size))
         indices_t = list(range((i_step-1)*self.batch_size, i_step*self.batch_size))
-        print("Indices_t ", indices_t)
+        # print("Indices_t ", indices_t)
         # retrieve image ids of sampled ids to make sure we don't get target distractor pairs
         # consisiting of same images
         imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
@@ -345,7 +347,6 @@ class threeDshapes_Dataset(Dataset):
         pairs,
         vocab_from_pretrained=False,
         max_sequence_length=0,
-        categorize_imgs=False,
         ):
 
         self.transform = img_transform

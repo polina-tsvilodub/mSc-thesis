@@ -128,7 +128,7 @@ def get_loader(transform,
     if mode == 'train':
         if pairs != "similar":
         # Randomly sample a caption length, and sample indices with that length.
-            indices = dataset.get_func_train_indices()
+            indices = dataset.get_func_train_indices(1)
         else:
             indices = dataset.get_func_similar_train_indices()
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
@@ -144,7 +144,7 @@ def get_loader(transform,
     elif mode == 'val':
         if pairs != "similar":
             # Randomly sample a caption length, and sample indices with that length.
-            indices = dataset.get_func_train_indices()
+            indices = dataset.get_func_train_indices(1)
         else:
             indices = dataset.get_func_similar_train_indices()
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.

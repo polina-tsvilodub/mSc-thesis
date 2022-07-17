@@ -117,7 +117,6 @@ class DecoderRNN(nn.Module):
         ####
         # outsource first step bc of image projection
         out, hidden_state = self.forward(inputs, caption, init_hiddens)
-        raw_outputs.append(out) #.extend(out)
         
         if decoding_strategy == "pure":
             probs = softmax(out)
@@ -132,7 +131,8 @@ class DecoderRNN(nn.Module):
             max_probs, cat_samples = torch.max(probs, dim = -1)
             log_p = torch.log(max_probs)
         elif decoding_strategy == "exp":
-            probs = softmax(out**5)
+            out = out**5
+            probs = softmax(out)
             cat_dist = torch.distributions.categorical.Categorical(probs)
             cat_samples = cat_dist.sample()
             entropy = cat_dist.entropy()
@@ -159,6 +159,8 @@ class DecoderRNN(nn.Module):
         else: 
             raise ValueError(f"Decoding strategy {decoding_strategy} is not implemented!")  
 
+        raw_outputs.append(out)
+
         output.append(cat_samples)
         cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
         # print("Cat samples ", cat_samples)
@@ -174,23 +176,25 @@ class DecoderRNN(nn.Module):
             # out = self.linear(lstm_out)
             
             # get and save probabilities and save raw outputs
-            raw_outputs.append(out)
-            probs = softmax(out)
+            
             ####
             if decoding_strategy == "pure":
+                probs = softmax(out)
                 cat_dist = torch.distributions.categorical.Categorical(probs)
                 cat_samples = cat_dist.sample()
                 entropy = cat_dist.entropy()
                 entropies.append(entropy)
                 log_p = cat_dist.log_prob(cat_samples)
             elif decoding_strategy == "greedy": 
+                probs = softmax(out)
                 # if in eval mode, take argmax
                 max_probs, cat_samples = torch.max(probs, dim = -1)
                 log_p = torch.log(max_probs)
                 entropy = -log_p * max_probs
                 entropies.append(entropy)
             elif decoding_strategy == "exp":
-                probs = softmax(probs**5)
+                out = out**5
+                probs = softmax(out)
                 cat_dist = torch.distributions.categorical.Categorical(probs)
                 cat_samples = cat_dist.sample()
                 entropy = cat_dist.entropy()
@@ -214,6 +218,7 @@ class DecoderRNN(nn.Module):
                 log_p = cat_dist.log_prob(cat_samples)
             else:
                 raise ValueError(f"Decoding strategy {decoding_strategy} is not implemented!")
+            raw_outputs.append(out)
             output.append(cat_samples)
             cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
             # print("Cat samples ", cat_samples)

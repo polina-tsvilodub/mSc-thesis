@@ -244,7 +244,7 @@ def train_reference_game(
     criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
 
     # Set the total number of training steps per epoch.
-    total_steps = math.ceil(len(data_loader_train.dataset.caption_lengths) / data_loader_train.batch_sampler.batch_size)
+    total_steps = math.floor(len(data_loader_train.dataset.caption_lengths) / data_loader_train.batch_sampler.batch_size)
     print("TOTAL STEPS:", total_steps)
 
     # training loop
