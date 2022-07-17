@@ -239,7 +239,6 @@ def get_loader_3dshapes(transform,
         vocab_from_file=vocab_from_file,
         vocab_from_pretrained=vocab_from_pretrained,
         max_sequence_length=25,
-        categorize_imgs=categorize_imgs,
         embedded_imgs=embedded_imgs,
         dataset_path=dataset_path,
         pairs=pairs,
@@ -249,7 +248,7 @@ def get_loader_3dshapes(transform,
 
     if mode == 'train':
         # Randomly sample a caption length, and sample indices with that length.
-        indices = dataset.get_func_train_indices()
+        indices = dataset.get_func_train_indices(1)
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.
@@ -260,24 +259,5 @@ def get_loader_3dshapes(transform,
             batch_sampler=torch.utils.data.sampler.BatchSampler(sampler=initial_sampler,
                                                                 batch_size=dataset.batch_size,
                                                                 drop_last=False))
-    # elif mode == 'val':
-    #     # Randomly sample a caption length, and sample indices with that length.
-    #     indices = dataset.get_func_train_indices()
-    #     # Create and assign a batch sampler to retrieve a batch with the sampled indices.
-    #     initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
-    #     # data loader for COCO dataset.
-    #     data_loader = torch.utils.data.DataLoader(
-    #         dataset=dataset, 
-    #         num_workers=num_workers,
-    #         batch_sampler=torch.utils.data.sampler.BatchSampler(sampler=initial_sampler,
-    #                                                             batch_size=dataset.batch_size,
-    #                                                             drop_last=False))
-    # else:
-    #     data_loader = torch.utils.data.DataLoader(
-    #         dataset=dataset,               
-    #         batch_size=dataset.batch_size,
-    #         shuffle=True,
-    #         num_workers=num_workers,
-    #     )
-
+    
     return data_loader

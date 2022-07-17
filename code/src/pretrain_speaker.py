@@ -1,6 +1,6 @@
 # import tensorflow as tf
 import os
-from utils.build_dataset import make_dataset, get_loader
+from utils.build_dataset import make_dataset, get_loader, get_loader_3dshapes
 from utils.download import maybe_download_and_extract
 from utils.train import pretrain_speaker
 from utils.early_stopping import EarlyStopping
@@ -86,6 +86,10 @@ def run_pretraining(
     print("Beginning speaker pretraining script...")
 
     if EXPERIMENT == "coco":
+
+        # path to pre-saved image features file
+        embedded_imgs = torch.load("train_logs/COCO_train_ResNet_features_reshaped_dict.pt")
+
         # download data 
         for filename in domains_list[DOWNLOAD_DIR_TRAIN]:
             url = BASE_URL + filename
@@ -131,6 +135,46 @@ def run_pretraining(
             dataset_path=VAL_DATASET,
             num_imgs=int(NUM_IMG),
         )
+
+    elif EXPERIMENT == "3dshapes":
+        # path to pre-saved image features file
+        embedded_imgs = torch.load("train_logs/3dshapes_all_ResNet_features_reshaped_all_sq.pt")#torch.cat(( torch.load("3dshapes_all_ResNet_features_reshaped_23000_first.pt"), torch.load("3dshapes_all_ResNet_features_reshaped_240000_first.pt") ), dim = 0)
+        transform_train = transforms.Compose([ 
+            transforms.ToPILImage(),
+            transforms.Resize(IMAGE_SIZE),                   # resize image resolution to 256 (along smaller edge, the other proportionally)
+            transforms.RandomCrop(224),
+            transforms.RandomHorizontalFlip(),               # horizontally flip image with probability=0.5
+            transforms.ToTensor(),                           # convert the PIL Image to a tensor
+            transforms.Normalize((0.485, 0.456, 0.406),      # normalize image for pre-trained model, tuples for means and std for the three img channels
+                         (0.229, 0.224, 0.225))])
+
+        DOWNLOAD_DIR_TRAIN = "../../data"
+
+        data_loader_train = get_loader_3dshapes(
+            transform=transform_train,
+            mode=MODE,
+            batch_size=BATCH_SIZE,
+            vocab_threshold=VOCAB_THRESHOLD,
+            vocab_file=VOCAB_FILE,
+            vocab_from_file=VOCAB_FROM_FILE,
+            download_dir=DOWNLOAD_DIR_TRAIN,
+            embedded_imgs=embedded_imgs,
+        )
+
+        data_loader_val = get_loader_3dshapes(
+            transform=transform_train,
+            mode="train",
+            batch_size=BATCH_SIZE,
+            vocab_threshold=VOCAB_THRESHOLD,
+            vocab_file=VOCAB_FILE,
+            vocab_from_file=VOCAB_FROM_FILE,
+            download_dir=DOWNLOAD_DIR_TRAIN,
+            embedded_imgs=embedded_imgs,
+            dataset_path=VAL_DATASET,
+            num_imgs=int(NUM_IMG),
+        )
+    else:
+        raise ValueError(f"Unknown experiment type {EXPERIMENT}")    
 
     print("NUMBER OF TRAIN IDX: ", len(data_loader_train.dataset.ids))
     print("NUMBER OF VAL IDX: ", len(data_loader_val.dataset.ids))

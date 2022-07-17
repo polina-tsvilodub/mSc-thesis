@@ -318,8 +318,7 @@ class COCOCaptionsDataset(Dataset):
         distractor_image = torch.stack(distractor_image)
         target_features = torch.stack(target_features)
         distractor_features = torch.stack(distractor_features)
-        # target_caption = torch.stack(target_caption)
-
+        
         return target_image, distractor_image, target_features, distractor_features, targets_list, text_list
 
 class threeDshapes_Dataset(Dataset):
@@ -419,7 +418,7 @@ class threeDshapes_Dataset(Dataset):
             # print("Type check before saving: ", type(imgIDs4train[0]))
             # torch.save(imgIDs4train, "ref_game_img_IDs_unique_imgIDs4train_3dshapes.pt")
             # torch.save(self._img_ids_flat, "pretrain_img_IDs_flat_3dshapes_short.pt")
-            # torch.save(self.ids, "pretrain_anns_flat_3dshapes_short.pt")
+            torch.save(self.ids, "train_logs/final/pretrain_img_IDs_3dshapes_exh_teacher_forcing_desc05_pureDecoding_vocab49_padding.pt")
             
         if mode == "val":
             pass
@@ -471,7 +470,7 @@ class threeDshapes_Dataset(Dataset):
             
             return target_img, dist_img, target_features, distractor_features, target_caption, distractor_caption
 
-    def get_func_train_indices(self):
+    def get_func_train_indices(self, i_step):
         """
         Simple POC function returning two lists on indices for the functional training. 
         Returns a list of inidces for targets and a list f indices for distractors. 
@@ -482,19 +481,13 @@ class threeDshapes_Dataset(Dataset):
             list: (int, int)
                 List of tuples of target and distractor indices, each for a single reference game iteration.
         """
-        
-        sel_length_t = np.random.choice(self.caption_lengths)
-
-        all_indices_t = np.where([self.caption_lengths[i] == sel_length_t for i in np.arange(len(self.caption_lengths))])[0]
-
-        indices_t = list(np.random.choice(all_indices_t, size=self.batch_size))
+        indices_t = list(range((i_step-1)*self.batch_size, i_step*self.batch_size))
+        # print("Indices_t ", indices_t)
         # retrieve image ids of sampled ids to make sure we don't get target distractor pairs
         # consisiting of same images
         imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
-        possible_inds_dist = list(set(np.arange(len(self.caption_lengths)) ) - set(indices_t) ) #[x for x in np.arange(len(self.caption_lengths)) if x not in indices_t and self._img_ids_flat[x] not in imgIDs_t]
-        checked_ind_d = set(possible_inds_dist) - set([self._img_ids_flat[x] for x in possible_inds_dist])
-        # print("Len check ind ", len(checked_ind_d))
-        indices_d = list(np.random.choice(list(checked_ind_d), size=self.batch_size))
+        possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t and self._img_ids_flat[x] not in imgIDs_t]
+        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size, replace=False))
         
         return list(zip(indices_t, indices_d))
 
@@ -510,15 +503,15 @@ class threeDshapes_Dataset(Dataset):
             target_caption.append(targ_c)
             distractor_caps.append(dist)
         
+        targets_list = pad_sequence(target_caption, batch_first=True, padding_value=self.vocab(self.vocab.pad_word))
         text_list = pad_sequence(distractor_caps, batch_first=True, padding_value=self.vocab(self.vocab.pad_word))
         
         target_image = torch.stack(target_image)
         distractor_image = torch.stack(distractor_image)
         target_features = torch.stack(target_features)
         distractor_features = torch.stack(distractor_features)
-        target_caption = torch.stack(target_caption)
-
-        return target_image, distractor_image, target_features, distractor_features, target_caption, text_list
+        
+        return target_image, distractor_image, target_features, distractor_features, targets_list, text_list
 
     def get_func_similar_train_indices(self):
             """
