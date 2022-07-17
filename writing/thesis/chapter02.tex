@@ -87,12 +87,14 @@ Previous work on captioning the MS COCO datase discussed in this section provide
 
 \section{Reinforcement Learning}
 
+\pt{Sift over italics and thelike.}
+
 \subsection{Introduction}
-A natural choice for training artificial agents to complete certain tasks like communicative tasks is reinforcement learning, as ``Reinforcement learning is a computational approach to understanding and automating goal-directed learning and decision-making'' (s.15, \cite{sutton2018reinforcement}).
+A natural choice for training interacting artificial agents to achieve goals and complete certain tasks like communicative tasks is reinforcement learning, as ``[r]einforcement learning is a computational approach to understanding and automating goal-directed learning and decision-making'' (s.15, \cite{sutton2018reinforcement}). In this framework, the agent learn to make decisions as to which actions to take, geven the environment, and receive responses to those actions from the environment putting the agents into new states. This repeats iteratively, until the agents learn how to effectively reach the desired goal state.
+%``The reinforcement learning problem is meant to be a straightforward framing of the problem of learning from interaction to achieve a goal. The learner and decision-maker is called the agent. [...] These interact continually, the agent selecting actions and the environment responding to those actions and presenting new situations to the agent.'' (p.53). 
+Therefore, a particular task is defined in terms of a complete definition of the environment, representing a particular instance of reinforcement learning (p. 54).
 
-``The reinforcement learning problem is meant to be a straightforward framing of the problem of learning from interaction to achieve a goal. The learner and decision-maker is called the agent. [...] These interact continually, the agent selecting actions and the environment responding to those actions and presenting new situations to the agent.'' (p.53). A particular task is defined in terms of a complete definition of the environment, representing a particular instance of reinforcement learning (p. 54).
-
-Therefore, reinforcement learning can be defined as learning the mapping from situations, represented as \textit{environments}, to optimal \textit{actions} that agent may choose in order to achieve the task goal, while maximizing the reward signal \parencite{sutton2018reinforcement}. Next to supervised and unsupervised learning, it represents one of three major learning paradigms in machine learning. 
+More precisely, reinforcement learning problems can be defined as learning the mapping from situations, represented as \textit{environments}, to optimal \textit{actions} that agent may choose in order to achieve the task goal, while maximizing the reward signal \parencite{sutton2018reinforcement}. The reward can be understood as the environment's feedback about the optimality of the action with respect to achieving the goal. Next to supervised and unsupervised learning, it represents one of three major learning paradigms in machine learning. 
 
 \begin{figure}
 	\centering
@@ -101,6 +103,7 @@ Therefore, reinforcement learning can be defined as learning the mapping from si
 	\label{fig:rl}
 \end{figure}
 
+The most important building blocks of RL systems are defined below:
 \pt{Definitions of: reward, environment, agents, actions, states, policy, value function, if necessary, q-learning maybe. An optiional model of the environment may also exist. }
 \begin{itemize}
 	\item agent: learner and decision maker in the interaction who tries to achieve a goal for a certain task.
@@ -110,17 +113,19 @@ Therefore, reinforcement learning can be defined as learning the mapping from si
 	\item value function: the expected total reward for agents starting the actions at the given state. These are adapted and reestimated based on observed action and reward sequences of the agents over their lifetime. 
 \end{itemize}
 
-Situations modelled by reinforcement learning are decision making sequences; such sequences are typically and straightforwardly formalized as Markov decision processes (MDPs), framing the problem of interactively learning to achieve a goal from interaction (p. 47). Here it is assumed that the interaction takes place over discrete timesteps $t = 0, 1,2 ...$. At each step $t$, the state $S_t \in S$ in which the agent is in can be considered as her current representation of the environment, where $S$ is the set of all possible states. Given the state, the agent selects an action $A_t \in A(s)$, where $A(s)$ denotes the set of all actions available in state at time $t$. At the next timestep the agent receives a reward $R_{t+1} \in R$ for the action $A_t$. These iterations can be formalized as finite MDPs if they consist of an $A, S$ and $R$ with a finite number of elements. In this case, the probability $p$ for a particular state $s'$ and reward $r'$ to occur at time $t$ is conditional on the previous state and action. A typical assumption made in the RL literature applied to multi-agent communication is that the states have the \textit{Markov property}, i.e., that they encode information from all previous interaction steps. Given $p$, one can compute state transition probabilities (i.e., probabilities for getting into a particular state given previous cisited states), and most critically, the expected rewards for given state and action combinations. The latter is especially important in order to estimate the return $G_t$ and thus, formally represent the objective of learning, namely maximizing the return. In present work, the following simple definition of $G_t$ is assumed: 
-$$G_t = R_{t+1} + R_{t+2} + ... + R_T$$ where $T$ is the final step of the action sequence. This sequence as a natural iteration of interactions is also called \textit{episodes}.  Different return formalizations, e.g., using expected discounted returns is popular in other domain, but cannot really be applied in the present reference game since the environment (i.e., the reference game) only provides one reward per entire episode (i.e., entire message generation). 
+More formally, decision making sequences modelled by reinforcement learning are straightforwardly formalized as Markov Decision Processes (MDPs), representing the problem of interactively learning to achieve a goal from interaction (p. 47). 
+Here it is assumed that the interaction takes place over discrete timesteps $t = 0, 1,2 ...$. At each step $t$, the state $S_t \in S$ in which the agent is in can be considered as her current representation of the environment, where $S$ is the set of all possible states. Given the state, the agent selects an action $A_t \in A(s)$, where $A(s)$ denotes the set of all actions available in state at time $t$. At the next timestep the agent receives a reward $R_{t+1} \in R$ for the action $A_t$. These iterations can be formalized as \textit{finite} MDPs if they consist of an $A, S$ and $R$ with finite number of elements. In this case, the probability $p$ for a particular state $s'$ and reward $r'$ to occur at time $t$ is conditional on the previous state and action. A typical assumption made in the RL literature applied to multi-agent communication is that the states have the \textit{Markov property}, i.e., that they encode information from all previous interaction steps. 
+Given $p$, one can then compute state transition probabilities (i.e., probabilities for getting into a particular state given previous visited states), and most critically, the expected rewards for given state and action combinations. The state transition probabilities are the characterisation of the environment dynamics.
+Expected rewards are especially important in order to estimate the return $G_t$ and thus, formally represent the objective of learning, namely maximizing the return. In present work, the following simple definition of $G_t$ is assumed: 
+$$G_t = R_{t+1} + R_{t+2} + ... + R_T$$ where $T$ is the final step of the action sequence and $R_{t+1}$ represents the reward received for the action $A(t)$. This sequence of interaction iterations is also called \textit{episodes}. Different return formalizations, e.g., using expected discounted returns, are used in other domains, but cannot really be applied in the present reference game scenario since the environment (i.e., the reference game) only provides one reward per entire episode (i.e., entire message generation). 
 
-Another critical part of RL algorithms is the value function, describing how valuable it is with respect to the expected return for an agent to be in a given state. Since these values depend on the taken actions, the last critical component is the policy. ``A policy is a mapping from states to probabilities'' of taking avalibale action: $\pi(a | s)$ the describes the probability that the agents choses the actiona inthe state s. The central problem of RL is then the estimation of an optimal policy, yielding a maximal reward. The following section reqviews different methods for estimating the policy, especially fpcusing on methods applicable to \textit{deep RL}, i.e., RL with deep neural network agents \parencite{lecun2015deep}.
+The mapping from actions to rewards is specified by the \textit{value function}. Since collected reward values depend on the taken actions, the last critical component of RL environments is the policy. ``A policy is a mapping from states to probabilities'' of taking avalibale action: $\pi(a | s)$ the describes the probability that the agents choses the action $a$ in the state $s$. The central problem of RL is then the estimation of an optimal policy, yielding a maximal reward. The following section reviews different methods for estimating the policy, especially focusing on methods applicable to \textit{deep RL}, i.e., RL with deep neural network agents akin to the ones used in present experiments \parencite{lecun2015deep}.
 
-Terminal state = state at the end of each episode.
-Action-value function? value function? necessary?
 
+%The central problem of RL is the estimation which action to take at each step in any state in order to maximize the return. To this end, in \textit{value-based approaches} the value function is estimated, which describes how valuable it is with respect to the expected return for an agent to be in a given state. 
+%Terminal state = state at the end of each episode.
+Action-value function? 
 % Concrete specification and notation of actions, rewards, states and policy.
-
-(Discounted) rewards.
 
 Value functions and optimal policies (up to p. 95).
 
@@ -132,8 +137,17 @@ Deep Q-learning.
 
 The so-called Actor-Critic methods consist of the policy acting as the actor from which the actions are sampled, and a critic, which is usually represented by the action value function \pt{def doublec hcek and refine}. The goal hereby is to estimate whether the chosen action improves the current state.  
 
-\pt{Policy-gradient method reinforce \parencite{williams1992simple, sutton2018reinforcement}. Mean baseline. } A particular framework, the so-called \textit{policy-gradient methods} for estimating the policy focus on improving the parameters of the policy, while taking advantage of observation made about the agent's individual interactions with the environment (p. 10). More specifically, this approach provides a solution to the issue of computational intractability of analytically solving for an optimal policy (p. 80) and instead focuses on the agent's experience simulated from the environmant.  
+\pt{Policy-gradient method reinforce \parencite{williams1992simple, sutton2018reinforcement}. Mean baseline. } 
+The so-called \textit{policy-gradient methods} focus on improving the parameters of the policy directly, in contrast to \textit{value-function methods} which first estimate the value function to then compute a deterministic policy \parencite{sutton2018reinforcement} \pt{add single sutton paper reference}. %More specifically, this approach provides a solution to the issue of computational intractability of analytically solving for an optimal policy (p. 80) and instead focuses on the agent's experience simulated from the environmant.  
+More specifically, the policy is approximated stocastically with a parametrized function, e.g., a neural network. The policy is the learnt by optimizing the parameters of the model $\theta$ with respect to performance of the agent, e.g., rewards at each step, $\rho$: $$ \alpha \frac{\delta \rho}{\delta \theta} \pt{formula page 2} $$ 
 
+This introduction is constrained to introducing a particular policy-gradient method---the algorithm REINFORCE which is used in the presented experiments \parencite{williams1992simple}. For discussion of further policy-gradient methods, \pt{see e.g....} 
+The REINFORCE algorithm posits that a locally optimal policy can be obtained by updating the weights $w_{ij}$ of the policy network accoring to 
+$$delta w_{ij} = \alpha_{ij} (r - b_{ij}) \frac{\delta log(\pi)}{\delta w_{ij}}$$
+where $\alpha_{ij}$ is the learning rate, $r$ is the reward, $b_{ij}$ is the baseline (see below for details) and $\pi$ is the policy network. \pt{double check last point}
 
+\textbf{Baseline selection} An important and difficult question in REINFORCE-based algorithms remains the selection of the baseline $b_{ij}$. Different studies compare the effects of\pt{adaptive baselines, mean baselines, ...} on convergence speed and task performance. \pt{While it has been shown that XXX might generally improve performance, upon initial exploratory simulations the addition of a non-zero baseline did not yield observable improvements of presented experiments and is therefore omitted in all presented experiments.}
+
+\textbf{Entropy regularization} 
 
 \pt{Add machine details in the expts section}
