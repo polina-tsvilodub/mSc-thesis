@@ -22,8 +22,10 @@
 \usepackage{siunitx}
 \usepackage{lscape}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{mathtools}
 \usepackage{hyperref}
+\usepackage{adjustbox}
 % define col width
 \newcolumntype{Y}{>{\hsize=4\hsize}X}
 \newcolumntype{s}{>{\hsize=0.25\hsize}X}
@@ -45,6 +47,7 @@
 \newcommand{\mf}[1]{\textcolor{Orange}{[rl: #1]}}  
 \newcommand{\pt}[1]{\textcolor{Purple}{[pt: #1]}} 
 
+\DeclareMathOperator*{\E}{\mathbb{E}}
 % define functions for reading results from csv
 \newcommand{\datafoldername}{R4Tex}
 
