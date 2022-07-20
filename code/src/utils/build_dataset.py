@@ -120,7 +120,6 @@ def get_loader(transform,
         vocab_from_file=vocab_from_file,
         vocab_from_pretrained=vocab_from_pretrained,
         max_sequence_length=15,
-        categorize_imgs=categorize_imgs,
         embedded_imgs=embedded_imgs,
     )
     

@@ -111,7 +111,7 @@ class COCOCaptionsDataset(Dataset):
             # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_pretrainGrid_decr05.pt")
             # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            torch.save(torch.tensor(self.ids), "train_logs/final/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_vocab4000_padding.pt")
+            torch.save(torch.tensor(self.ids), "train_logs/final/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_vocab4000_padding_cont_2.pt")
 
         elif mode == "val":
             with open("notebooks/imgID2annID_val.json", "r") as fp:
@@ -271,10 +271,11 @@ class COCOCaptionsDataset(Dataset):
             print("Target categories: ", c)
             # align the target and distractor categories 
             possible_inds = []
-            for i, c_t in enumerate(c["categories"]):
+            # get distractor images matching in at least three of the target categories
+            for i, c_t in enumerate(c["categories"][:3]):
                 print("I, c_t ", i, c_t)
                 if i == 0:
-                    possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(self._img_ids_flat)))
+                    possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(self._img_ids_flat) - set([self._img_ids_flat[i] for i in indices_t]))) # remove used target img ids here to avoid having targets and dists from same images
                 else:
                     possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(possible_inds)))
             
@@ -410,7 +411,7 @@ class threeDshapes_Dataset(Dataset):
 
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
-            all_tokens = [tokenizer(str(self.ids[index]).replace("-", "")) for index in tqdm(np.arange(len(self.ids)))] 
+            all_tokens = [tokenizer(str(self.ids[index]).replace("-", " ")) for index in tqdm(np.arange(len(self.ids)))] 
             self.caption_lengths = [len(token) for token in all_tokens]
             
             # print pretraining IDs for later separation from functional training
@@ -447,8 +448,8 @@ class threeDshapes_Dataset(Dataset):
             target_features = self.embedded_imgs[int(self._img_ids_flat[target_idx])]#.squeeze(0)
             distractor_features = self.embedded_imgs[int(self._img_ids_flat[distractor_idx])]#.squeeze(0)
             
-            tokens = self.tokenizer(str(target_lbl).lower().replace("-", ""))
-            tokens_dist = self.tokenizer(str(dist_lbl).lower().replace("-", ""))
+            tokens = self.tokenizer(str(target_lbl).lower().replace("-", " "))
+            tokens_dist = self.tokenizer(str(dist_lbl).lower().replace("-", " "))
             # Convert caption to tensor of word ids, append start and end tokens.
             target_caption = []
             distractor_caption = []
