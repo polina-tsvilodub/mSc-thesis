@@ -42,7 +42,7 @@ The dataset was downloaded from \url{https://storage.cloud.google.com/3d-shapes/
 %\pt{XXX images were used for training the agents in the 3Dshapes experiment, and YYY images were used for testing.}
 
 \subsubsection{Caption Generation}
-\pt{TBD}
+\pt{TBD. Cite Bruni's paper with the grammar stuff.}
 %This dataset was chosen due to the systematicity of its content , allowing to generate natural language captions for each image which would exhaustively describe all features of the images. Since no such captions exist to the author's knowldege, they are generated as part of this thesis. To this end, a base context-free grammar (CFG) containing production rules for captions was manually created. The syntactic rules were constructed on the basis of examples of captions created by the author for samples from the dataset. Each caption must contain descriptions of all six feature dimensions. The terminal production rules mapping the pre-terminal to natural language labels are chosen for each image based on its unique feature value configuration. For each image, \pt{X captions are sampled from all the possible productions allowed by the grammar}.
 
 %\pt{Discuss aspects to be taken care of, like vocab size, caption lengths etc}.
@@ -79,8 +79,9 @@ All experiments were trained with a batch size of 64 pairs, using the Adam optim
 The speaker parameters $\theta_S$ were updated by optimizing a compound loss function $J_s$. More precisely, the speaker loss consisted of a weighted sum of a functional loss $L_f$ and a structural loss $L_s$. The former was computed via the REINFORCE rule based on the listener's task performance (i.e., referential success). The speaker received the reward 1 if the listener guessed the target successfully, and -1 otherwise. The latter was computed via cross-entropy between the message produced by the speaker and the ground truth caption for the given target image. $L_f$ additionally included an entropy regularization term, weighted by 0.1 \pt{references}. The resulting loss is $J_s = L_f + 0.1 L_s$. 
 The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ optimized based on the guessed target classification of the images and the ground truth targets. 
 
-%\section{Experiments}
+\section{Experiments}
 
+\pt{when discussing results and esp PPL, \cite{havrylov2017emergence} also compute encoder PPLs}
 %\subsection{Baseline}
 
 %\subsubsection{Training}
