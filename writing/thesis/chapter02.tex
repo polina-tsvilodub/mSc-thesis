@@ -23,6 +23,7 @@ This chapter reviews selected technical aspects and related work relevant to the
 		Speaker / sender             & Agent generating messages in a multi-agent communication reference game setting                                                                        \\ \hline
 		Listener / receiver          & Agent receiving messages along with visual input and making the selection of the target referent \newline in a multi-agent communication reference game setting \\ \hline
 		Image vectors / features / embeddings & Vectorized numerical representations of raw images, usually produced by taking the output of the last layer of a trained CNN \\ \hline
+		LM 						& Language model \parencite{jurafsky2000speech} \\ \hline
 	\end{tabularx}
 %\end{adjustbox}
 \caption{\label{tab:defs}A table of abbreviations and commonly used terms the knowledge of which is presupposed for the reader. Please refer to, e.g., \cite{goodfellow2016deep} for an overview.}
@@ -40,7 +41,7 @@ One of the first end-to-end deep neural architecture was developed by \cite{viny
 \begin{equation}
 \theta^* = \operatorname*{argmin}_\theta \sum_{(I, S)} log\; p(S \mid I; \theta) 
 \end{equation}
-of example image descriptions $S$, given the image vector $I$ and the network parameters $\theta$. The descriptions are vectorized by a trainable embedding layer through which they are passed before being passed through the LSTM. Figure \ref{fig:lstm} exemplifies the proposed training pipeline and the LSTM cell architecture. The hidden size of the LSTM is 512, and it is trained using the so-called teacher forcing mode (see Section \ref{model_pretraining} below for details). The minimized loss is the sum of negative log likelihoods of the target words at each time step. Only the last layer of the CNN which is initialized with weights from a model pretrained on ImageNet is trainable. Furthermore, dropout layers and ensebling of the model (i.e., predictions from several models are combined to produce the reported results). The authors use beam search as the decoding strategy during inference and achieve a BLEU-4 score of 27.2 on the MS COCO test set (see Section \ref{image_cap_metrics} below for details on the metrics), next to comparably high results on other datasets. 
+of example image descriptions $S$, given the image vector $I$ and the network parameters $\theta$. The descriptions are vectorized by a trainable embedding layer through which they are passed before being passed through the LSTM. Figure \ref{fig:lstm} exemplifies the proposed training pipeline and the LSTM cell architecture. The hidden size of the LSTM is 512, and it is trained using the so-called teacher forcing mode (see Section \ref{model_pretraining} below for details). The minimized loss is the sum of negative log likelihoods of the target words at each time step (i. e., the cross-entropy loss). Only the last layer of the CNN which is initialized with weights from a model pretrained on ImageNet is trainable. Furthermore, dropout layers and ensebling of the model (i.e., predictions from several models are combined to produce the reported results). The authors use beam search as the decoding strategy during inference and achieve a BLEU-4 score of 27.2 on the MS COCO test set (see Section \ref{image_cap_metrics} below for details on the metrics), next to comparably high results on other datasets. 
 This architecture is closely related to the architecture of the sender agent in the present experiments. \cite{donahue2015long} propose a very similar approach.
 
 \begin{figure}
@@ -205,6 +206,8 @@ Another method for achieving more stable convergence of the policy is \textbf{en
 \Delta w_{ij} = \alpha_{ij} (r - b_{ij}) \frac{\partial log(\pi)}{\partial w_{ij}} + \beta (- \sum_{A_t \in \mathcal{A}(s)} \pi(A_t \mid S_t) \; log \; \pi(A_t \mid S_t))
 \end{equation}
 The disadvantage of using entropy regularization is the introduction of an entropy weight $\beta$ as an additional hyperparameter to be tuned. However, it has been successfully used in practice and is also included in presented experiments.
+
+\pt{chapter summary goes here.}
 
 The next chapter describes how the methods introduced in this chapter come together in work on multi-agent communication.
 
