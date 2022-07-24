@@ -51,12 +51,12 @@ class COCOCaptionsDataset(Dataset):
         self.pairs = pairs
 
         # read categories2img
-        with open("./../../data/categories_to_image_IDs_train_filtered.json", "r") as fp:
+        with open("../../../data/categories_to_image_IDs_train_filtered.json", "r") as fp:
             f = json.load(fp)
         self.categories2image = f    
         self.category_ids = list(f.keys())
         # read img2categories
-        with open("./../../data/imageIDs_to_categories_train_filtered.json", "r") as fp:
+        with open("../../../data/imageIDs_to_categories_train_filtered.json", "r") as fp:
             f = json.load(fp)
         self.imgs2cats = f
         # read imgID to annIDs mapping file
@@ -75,7 +75,7 @@ class COCOCaptionsDataset(Dataset):
             with open("imgID2annID.json", "r") as fp:
                 f = json.load(fp)
             if pairs == "similar":
-                imgIDs4train = torch.load("../../data/ref_game_similar_img_IDs_filtered.pt")[:30000] 
+                imgIDs4train = torch.load("../../../data/ref_game_similar_img_IDs_filtered.pt")[:30000] 
             else:
                 imgIDs4train = list(f.keys())[:30000] # 
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
@@ -90,16 +90,16 @@ class COCOCaptionsDataset(Dataset):
                 else:
                     self.ids = torch.load(dataset_path).tolist()
             else:
-                self.ids = torch.load("train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+                self.ids = torch.load("../train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
             
-            if dataset_path == "notebooks/val_split_IDs_from_COCO_train_tensor.pt":
+            if dataset_path == "./val_split_IDs_from_COCO_train_tensor.pt":
                 self._img_ids_flat = [self.coco.loadAnns(i)[0]['image_id'] for i in self.ids]
             else:   
                 self._img_ids_flat = [i[1] for i in _ids for x in i[0]]
             
 
             # set the image IDs for validation during early stopping to avoid overlapping images
-            self.ids_val = torch.load("train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
+            self.ids_val = torch.load("../train_logs/pretrain_val_img_IDs_2imgs.pt").tolist() #_ids[70000:73700]
             print('Obtaining caption lengths...')
             tokenizer = get_tokenizer("basic_english") # nltk.tokenize.word_tokenize(str(self.coco.anns[self.ids[index]]['caption']).lower())
             all_tokens = [tokenizer(str(self.coco.anns[self.ids[index]]['caption']).lower()) for index in tqdm(np.arange(len(self.ids)))] 
@@ -111,10 +111,10 @@ class COCOCaptionsDataset(Dataset):
             # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_pretrainGrid_decr05.pt")
             # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            torch.save(torch.tensor(self.ids), "train_logs/final/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_vocab4000_padding_cont_2.pt")
+            # torch.save(torch.tensor(self.ids), "train_logs/final/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_vocab4000_padding_cont_4.pt")
 
         elif mode == "val":
-            with open("notebooks/imgID2annID_val.json", "r") as fp:
+            with open("./imgID2annID_val.json", "r") as fp:
                 f = json.load(fp)
             imgIDs4val = list(f.keys())
             _ids = [(f[i], i) for i in imgIDs4val] # list of tuples of shape (annID_lst, imgID)
@@ -368,7 +368,7 @@ class threeDshapes_Dataset(Dataset):
             'shape': [0,1,2,3], 
             'orientation': [-30,-25.714285714285715,-21.42857142857143,-17.142857142857142,-12.857142857142858,-8.571428571428573,-4.285714285714285,0, 4.285714285714285,8.57142857142857,12.857142857142854,17.14285714285714,21.42857142857143,25.714285714285715,30],
         }
-        with open("notebooks/categories2imgIDs_3dshapes_fixed_float_train.json", "r") as fp:
+        with open("./categories2imgIDs_3dshapes_fixed_float_train.json", "r") as fp:
             self.cats2imgIDs = json.load(fp)
 
         if mode == "train":
@@ -377,9 +377,9 @@ class threeDshapes_Dataset(Dataset):
             self.numeric_labels = np.load(
                 os.path.join(download_dir, "3dshapes_labels_np.npy")
             )
-            with open("../../data/3dshapes_captions_fixed.json", "r") as fp:
+            with open("../../../data/3dshapes_captions_fixed.json", "r") as fp:
                 self.labels = json.load(fp)
-            with open("../../data/3dshapes_captions_short.json", "r") as fp:
+            with open("../../../data/3dshapes_captions_short.json", "r") as fp:
                 self.labels_short = json.load(fp)
                 
             
@@ -419,7 +419,7 @@ class threeDshapes_Dataset(Dataset):
             # print("Type check before saving: ", type(imgIDs4train[0]))
             # torch.save(imgIDs4train, "ref_game_img_IDs_unique_imgIDs4train_3dshapes.pt")
             # torch.save(self._img_ids_flat, "pretrain_img_IDs_flat_3dshapes_short.pt")
-            torch.save(self.ids, "train_logs/final/pretrain_img_IDs_3dshapes_exh_teacher_forcing_desc05_pureDecoding_vocab49_padding.pt")
+            # torch.save(self.ids, "train_logs/final/pretrain_img_IDs_3dshapes_exh_teacher_forcing_desc05_pureDecoding_vocab49_padding_cont4.pt")
             
         if mode == "val":
             pass

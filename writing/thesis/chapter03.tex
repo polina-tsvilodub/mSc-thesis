@@ -4,7 +4,7 @@ This chapter reviews related work on multi-agent communication---the core domain
 
 \pt{maybe find a way to say that there are other neighboring areas of research like visual dialogue, multimodal semantics, visual question answering etc. possibly in discussion.}
 
-\section{Multi-Agent Communication}
+\section{Introduction}
 Research on multi-agent communication has received increasing attention over the recent years, as this domain focuses on research questions of high relevance to cognitive science \parencite{lazaridou2020emergent}. More precisely, two main areas of research are often addressed: first, the conditions under which a language emerges and which emergent properties can be observed; and second, the ability of the agents to pick up a given language system. % thus investigating whether tractable human-agent communication channels can be learned via realistic interaction.
 The second direction has also been considered with respect to \textit{grounding} a given language in the visual world. That is, approaches to teaching agents to use language applied to realistic visual input are investigated. Grounding is important both from modeling and cognitive perspectives: for instance, \cite{bruni2014multimodal} show that representations learned from both text and image data are more plausible than purely text-based representations; furthermore, vision is an integral part of human communication \parencite{tomasello2010origins, harnad1990symbol}. 
 
@@ -15,8 +15,38 @@ Irrespectively of the research focus, artifical agents which interact with each 
 
 \pt{I feel like a section on super general aspects, like having two agents doing some task and being jointly trained, is missing. Maybe visuals would be cool.}
 
-\subsection{Agent Architecture and Training}
+Communication has been embedded in various tasks simulated in multi-agent settings. In some tasks like \pt{FILL ME} the idea is to use communication for more efficient cooperation and expertise transfer; in other tasks, communication itself is the core task. The latter allows to focus on properties of communicative systems that artificial agents might develop or acquire, thus allowing to compare them to human language. Studying the ability of artificial agents to produce \textit{discriminative captions} for images in context is the goal of this work. A task allowing to do so is the so-called \textit{reference game}. Therefore, this task and related work with human participants is described first, before transitioning to related work on multi-agent communication.
 
+\pt{just to a section the chapter proceeds as follows and through out first paragraph and remove intro section.}
+
+\section{Reference Games}
+\label{reference_games}
+
+Reference games are a type of the so-called \textit{Lewis singalling game} \parencite{lewis1969convention, skyrms2010signals}.
+Signaliing games were developed as an accont of \textit{conventional meaning} \pt{add def}. These games include two agents, a sender and a receiver. Only the sender observes a state sampled at random and chooses a message which is sent to the receiver. The set of possible messages is known to both agents. Based on the message, the receiver selects a state she chose based on the message. The game is a success if the gessed state and the state observed by the sender match, such that this game is driven by the agents having a common interest \parencite{lewis1969convention, franke2016evolution}. \pt{check if there might be a better reference}. 
+
+\textit{Reference games} are then a specific instance of signalling games in which the meaning is already conventioanlly established. The sender samples a particular target among a set of distractors which may be a subset of all possible objects and \textit{refers} to it with her message. The receiver's task is then the identification of the target. 
+
+Reference games have been imployed in a wide range of studies with various research questions. \cite{franke2016reasoning} investigate whether pragmatic reasoning in reference games is population-level or individual. Referring experessions?
+
+\cite{lazaridou2018emergence} also helpful for a review.
+
+Multimodality aspects.
+
+Discriminative caption goal. Generally work on discriminative / contrastive communication, more from a cogsci and linguistics perspective.
+
+Applied to artificial agents, the reference game proceeds as follows: arrays containing a target image among $n \geq 1$ distractor images are sampled from the set of all images $I$. Both agents have access to the images and usually have the same representation; the sender agent knows which image is the target, the receiver does not. The sender emits a message $m, |m| \geq 1$ (assuming discrete communication; see Section \ref{multi_agent_arch}) sampled from the shared vocabulary $V$. Given $m$, the receiver has to correctly guess which of the images in the array is the target. Experiments in this thesis are limited to using one target image in context of only one distractor, but thy do not depend on this confinement.
+
+\section{Discriminative Language Use}
+
+Image captioning: 
+\pt{there is other work specifically on discriminative captions. has to be reviewed: \cite{vedantam2017context, dai2017contrastive, cohn2018pragmatically}, \cite{andreas2016reasoning} already reviewed below, check how to organize.}
+
+Contrastive language use: adjectives: cf. sedivy et al, aparicio. 
+
+\section{Multi-Agent Communication}
+\subsection{Agent Architecture and Training}
+\label{multi_agent_arch}
 The main architectural differences concern the type of model representing the artificial agent and the type of communication channel they use.
 As described in Section \ref{rl}, experiments wherein agents learn to complete a task by interacting with the environment and with each other are typically trained with reinforcement learning. Multi-agent communication is a specific type of such experiments in that (one of) the tasks agents learn are communicative and cooperative, and one of the agents can be considered the sender and the other the receiver of the communication \parencite[cf.][]{tan1993multi, lazaridou2016multi}.
 Based on the chosen communication channel and the precise communicative task, specific architectural decisions and optimization algorithms differ. 
@@ -27,7 +57,8 @@ While early work in multi-agent communication focuses on structured agents \pare
 %1) agent architecture: hand crafted vs deep; for deep: kind of network, esp. recurrent layer
 %2) loss and training approach: Q-learning \parencite{foerster2016learning}, Gumbel-Softmax \parencite{havrylov2017emergence}, REINFORCE.  \parencite{lazaridou2020emergent, williams1992simple}. 
 
-\cite{lazaridou2016multi} first show that neural agents can efficiently reference realistic visual inputs in the presence of distractors by developing a communication protocol from scratch. To this end, \textcite{lazaridou2016multi} conduct several experiments employing feed-forward and CNN agents. In particular, in their main experiment, they set up a reference game, where a sender agent emits a single discrete symbol referring to one of two images provided to both the sender and the receiver, sampled from the ImageNet dataset \parencite{deng2009imagenet}. The receiver agent has to guess  which image is the intended target, based on the symbol received from the sender (see Section \ref{reference_games} for details). %They use a subset of the dataset containing 100 images from each of 20 general categories.
+\cite{lazaridou2016multi} first show that neural agents can efficiently reference realistic visual inputs in the presence of distractors by developing a communication protocol from scratch. To this end, \textcite{lazaridou2016multi} conduct several experiments employing feed-forward and CNN agents. In particular, in their main experiment, they set up a reference game, where a sender agent emits a single discrete symbol referring to one of two images provided to both the sender and the receiver, sampled from the ImageNet dataset \parencite{deng2009imagenet}. The discretization of the agents' communication channel is sometimes also called the \textit{discrete bottelneck} \parencite{lazaridou2020multi}. 
+The receiver agent has to guess  which image is the intended target, based on the symbol received from the sender (see Section \ref{reference_games} for details). %They use a subset of the dataset containing 100 images from each of 20 general categories.
 \cite{lazaridou2016multi} set up two versions of the sender. The ``agnostic sender'' consists of a two-layer feed forward neural network, embedding both images and producing a score over the vocabulary given the concatenation of image embeddings \parencite[][p. 3]{lazaridou2016multi}. The ``informed sender'' consists of a three-layer neural network, applying two convolutional layers to embeddings of both images which are treated as different channels \parencite[][p. 3]{lazaridou2016multi}. It also outputs scores over the vocabulary. For both architecures the scores are converted into a Gibbs distribution from which the emitted message symbol is sampled. The receiver agent consists if a two-layer feed forward network which embeds both images and computes the dot products between these embeddings and the one-hot encoded message. The final target image choice is sampled from the Gibbs distribution computed from the dot products. %The agents are trained with REINFORCE which updates parameters of the speaker and listener policies by minimizing the negative expected reward. The speaker and listener policies are parametrised by the weights of the respective neural networks. The sender policy is $\pi(v \in V \mid i_L, i_R, t \in \{L, R\})$ where $V$ is the vocabulary, $i_L, i_R$ are the left and right images and $t$ is the position of the target. The receiver policy is $\pi(t \in \{L, R\}\mid v_s, i_L, i_R)$, where $v_s$ is the message received from the sender and $t$ is the guessed position of the target image. \textcite{lazaridou2016multi} set the reward to 1 if the image picked by the receiver is the target and 0 otherwise. 
 They found that agents achieve high referential success, and that the informed sender produces semantically more natural symbols (i.e., the same ones for the same image categories) than the agnostic one. In a further experiment, the authors successfully pressure the agents to communicate about more high-level properties by sampling instances of different subcategories within the same basic-level category for the image pairs.%, and achieve a small increase in label purity (i. e., in the proportion of labels agreeing with the major cluster label). 
 Finally, they perform an experiment grounding the communication in natural language wherein the sender agent has to use natural language category labels as message symbols. The sender is trained by switching between reference game play and image classification on ImageNet data. However, the vocabulary is limited to 100 words, and the sender only produces one-word messages. %They observe a higher symbol purity in this experiment, while retaining referential success. 	
@@ -39,12 +70,12 @@ For both systems, the sender consists of an input network with a fully connected
 The receiver has the same architecture. The DIAL agents are connected via a continuous vector which can be seen as an activation layer passing the internal state of the sender to the receiver.
 Experiments with different variants of a riddle task and an image classification task on the MNIST dataset were conducted. Results on the former task show that the agents were able to learn an optimal policy although DIAL agents converged faster, yet sharing the weights between the sender and receiver agents was critical for RIAL. DIAL with parameter sharing outperformed other experiments. Furthermore, they found that adding noise to the communication was critical for successful learning for RIAL. Results of the second task provided similar results for DIAL, while RIAL failed to converge stably on the multi-step interaction version of this task. 
 The discrete system is trained with deep $Q$-learning (see Section \ref{rl_methods}), while the continuous system was trained by additionally backpropagating gradients end-to-end between the two agents. %Furthermore, the former but not the latter case includes modeling wherein agents have access to each other's internal representations of the environment, which was also argued to be unnatural when developing a system to investigate human communication \pt{REF}. 
-The DIAL results pose an interesting question regarding the comparability of such a system where the internal representations of a speaker are directly passed to the listener to human communication \parencite[cf.][]{lazaridou2020emergent, hockett1960origin}. The authors, however, argue that this direct error propagation can be interpreted as communicative feedback which is also part of human communication.
+The DIAL results pose an interesting question regarding the comparability of such a system where the internal representations of a speaker are directly passed to the listener to human communication \parencite[cf.][]{lazaridou2020emergent, hockett1960origin}. The authors, however, argue that this direct error propagation can be interpreted as communicative feedback which is also part of human communication. Further, while the possibility to use DIAL with continuous communication is attractive from a machine learning perspective due to its straightforward differentiability, human languages are typically considered discrete signalling systems \parencite{hockett1960origin}. 
 
 \cite{havrylov2017emergence} further extend work on multi-agent communication by modeling agents which  communicate with variable-length strings of symbols in a reference game. 
 Their architecture is based on the proposal \cite{lazaridou2016multi} with the difference that the sender agent only has access to the target image. Furthermore, their agents consist of LSTM layers. Information about the target image is injected by initializing the hidden state of the sender LSTM with the image feature vector, extracted from a pretrained VGG CNN. The sender generates the message by sampling tokens from the vocabulary similarly to the image captioning system by \cite{vinyals2015show} described in Section \ref{image_captioning}. The vocabulary consists of 10,000 tokens, the LSTM hidden size is 512, and the token embeddings are 256-dimensional. 
 The receiver interprets the message by encoding it with the LSTM and computing a probability distribution over dot products of image features and the affine-transformed hidden state of the LSTM. The image with the highest probability is chosen as the target. \cite{havrylov2017emergence} further attempt to make the statistical properties of the emergent protocol as similar to natural language as possible by minimizing the KL-divergence between the learned conditional token distribution and a pretrained language model.
-They compare agents trained via the straight-through Gumbel-softmax estimator to agents trained with REINFORCE. The straight-through Gumbel-softmax estimator is a differentiable approximation of discrete actions (i. e., tokens) with a continuous relaxation applied in the backward pass of the backpropagation, while still using discrete representations in the forward pass.
+They compare agents trained via the \textit{straight-through Gumbel-softmax estimator} to agents trained with REINFORCE. The straight-through Gumbel-softmax estimator is a differentiable approximation of discrete actions (i. e., tokens) with a continuous relaxation applied in the backward pass of the backpropagation, while still using discrete representations in the forward pass. 
 That is, one-hot encoded tokens are replaced with samples $w_k$ obtained by sampling $K$ samples  $\{u_k\}_{k=1}^K$ from the random variable $u \sim U(0,1)$. Each $u_k$ is transformed and then used in the sample computation:
 \begin{equation}
 \begin{aligned}
@@ -52,8 +83,8 @@ g_k = -log(-log(u_k)) \\
 w_k = \frac{exp((log \; p_k + g_k) / \tau)}{\sum_{i=1}^{K} exp((log \; p_i + g_i) / \tau)}
 \end{aligned}
 \end{equation}
-where $\tau$ is the temperature, $p_i$ and $p_k$ are token probabilites. The samples are discretized with argmax for the forward pass. 
-It is argued in the literature that this estimation allows more efficient gradient estimation given larger action spaces for which REINFORCE produces very high variance estimates, e. g., when the vocabulary size is larger \parencite{havrylov2017emergence}.
+where $\tau$ is the temperature, $p_i$ and $p_k$ are token probabilites. The samples are discretized with argmax for the forward pass. Thus, it is an alternative to REINFORCE in this setting.
+It is argued in the literature that this approximation allows more efficient gradient estimation given larger action spaces for which REINFORCE produces very high variance estimates, e. g., when the vocabulary size is larger \parencite{havrylov2017emergence}.
 
 Experiments on the MS COCO dataset are conducted, selecting one image in batches of 128 as the target. They showed that agents trained with Gumbel-softmax converge faster than those trained with REINFORCE, but both are able to achieve high referential success. Further, they find that communication success increases with maximum message length for both algorithms. They also find that the emergent communication protocol has multiple representations of the same information and that the messages seem to have hierarchical coding. They also conduct an experiment wherein the sender is trained with a combined loss on both an image captioning and reference game task in order to attempt to grounding the tokens in the images. However, this system didn't improve in terms of caption quality. To sum up, this work showed that agents can successfully develop multi-token communication protocols for solving referential tasks.
 
@@ -69,12 +100,6 @@ The noisy channel reranker model by \cite{lazaridou2020multi} is closely related
 \cite{lee2019countering} use another architecture---an attention based sequence-to-sequence machine translation model with one GRU layer---for both agents. 
 The agents play a multi-modal translation game wherein the first agent is tasked with the translation of a sequence from French to English and the second---from English to German. Both agents are pretrained on the translation task before the communication game. This setup is used in order to investigate \textit{language drift} of the pivot language English, i. e., its deterioration (see Chapter \ref{chapter04} for details), as the agents are trained on French-German translation with REINFORCE (see Chapter \ref{chapter02} for details). They compare the mitigation of language drift through a language modeling constraint (i. e., incorporating the maximization of the likelihood of the English sentence under a pretrained LM into the reward) to grounding (i. e., maximizing the likelihood of an image corresponding to the English sentence under a pretrained image retrieval model). The LM is a one-layer LSTM; in the grounding model, image features are extracted using a pretrained ResNet-152. \cite{lee2019countering} find that the agents are best able to learn decent French-German translation when mitigating language drift with both an LM constraint and grounding. \pt{check italics of language drift and reference to chapter 4 thru chapter}
 
-\textbf{Training}
-
-The discretization of the agents' communication channel is sometimes also called the \textit{discrete bottelneck} \parencite{lazaridou2020multi}. 
-While being easier from a modeling perspective due to the differentiability of a continuous channel, the former channel architecture is less naturalistic, as human languages are considered discrete signalling systems \parencite{hockett1960origin}. 
-
-There are different ways to overcome the technical challenge of training a system with a discrete bottleneck: using the REINFORCE algorithm, or using a continuous approximation \cite{havrylov2017emergence}. 
 
 \subsection{Tasks}
 
@@ -102,20 +127,3 @@ Compositionality. also paper by Bruni.
 
 \pt{Summarise in detail base paper}
 
-
-\section{Reference Games}
-\label{reference_games}
-Following previous work, presented multi-agent communication is investigated in an environment wherein the communication itself plays a central role, namely a reference game. This setting is developed based on the so-called \textit{singalling game} \parencite[e.g.,][]{lewis1969convention, skyrms2010signals} \pt{ add some prose}. 
-
-\cite{lazaridou2018emergence} also helpful for a review.
-
-Describe the idea of seeing several images, target distractor, producing and sending message.
-The current experiments are limited to using one target image in context of only one distractor, but thy do not depend on this confinement.
-Discuss the similar experiment. 
-
-Multimodality aspects.
-
-Discriminative caption goal. Generally work on discriminative / contrastive communication, more froma cogsci and linguistics perspective.
-
-The experiments conducted in this thesis are \textit{reference games} played by the agents. Therefore, this section provides an overview and background of the task. 
-A reference game is an instance of the \textit{Lewis signaling game} . 

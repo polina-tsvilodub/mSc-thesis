@@ -9,6 +9,7 @@ from . import early_stopping
 import torch.nn as nn 
 from drift_metrics import metrics
 import random
+from time import perf_counter
 
 def validate_model(
     data_loader_val,
@@ -55,7 +56,6 @@ def validate_model(
     val_running_loss = 0.0
     val_running_ppl = 0.0
     counter = 0
-    embedded_imgs = torch.load("./notebooks/resnet_pretrain_embedded_val_imgs.pt")
     total_steps = math.floor(len(data_loader_val.dataset.caption_lengths) / data_loader_val.batch_sampler.batch_size)
     print("Val total steps: ", total_steps+1)
     criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
@@ -95,7 +95,9 @@ def validate_model(
             # Calculate the batch loss.
             loss = criterion(outputs.transpose(1,2), target_captions[:, 1:])   
             ppl = torch.exp(loss).item()
+            val_running_loss += loss.item()
             val_running_ppl += ppl
+
             val_ppl.append(ppl)
             val_losses.append(loss.item())
 
@@ -117,8 +119,6 @@ def validate_model(
             nl_true_caption = [" ".join(nl_true_cap) for nl_true_cap in nl_true_caption] #" ".join(nl_true_caption)
             structural_drift_true = drift_meter.structural_drift(nl_true_caption)
             structural_drifts_true.append(structural_drift_true.item())
-
-            val_running_loss += loss.item()
             
         
         val_loss = val_running_loss / counter
@@ -201,7 +201,7 @@ def pretrain_speaker(
     early_stopper = early_stopping.EarlyStopping(patience=3, min_delta=0.03)
 
     # teacher forcing schedule
-    use_teacher_forcing_rate = 1
+    use_teacher_forcing_rate = 0.0078125
     # the value of the inverse sigmoid below is subject to hyperparam tuning as well
     # the higher the number, the longer teacher focing will be used
     k = 150
@@ -308,11 +308,15 @@ def pretrain_speaker(
                 #     start_caption = torch.cat((pred_ind, pred_ind), dim = -1)
                 #     print("Duplicated predicted index: ", start_caption.shape)
                     max_seq_length = target_captions.shape[1]-1
+                    # t1 = perf_counter()
                     captions_pred, log_probs, outputs, entropies = decoder.sample(
                         both_images, 
                         max_sequence_length=max_seq_length, 
                         decoding_strategy="pure"
                     )
+                    # t2 = perf_counter()
+                    # print("Sampling for one batch took: ", round(t2 - t1, 3))
+
             # The size of the vocabulary.
             vocab_size = len(data_loader.dataset.vocab)
 
@@ -361,6 +365,8 @@ def pretrain_speaker(
                     decoder,
                     drift_meter,
                 )     
+                print("Val results: ", val_loss, val_ppl_out, val_losses_list, val_ppls_list, eval_steps, str_drifts, str_drifts_true)
+                print("Val results: ", val_loss, val_ppl_out, len(val_losses_list), len(val_ppls_list), len(eval_steps), len(str_drifts), len(str_drifts_true))
                 
                 val_stats = 'Epoch [%d/%d], Step [%d/%d], Validation loss: %.4f' % (epoch, num_epochs, i, total_steps, val_loss)
                 print(val_stats)
@@ -372,6 +378,8 @@ def pretrain_speaker(
                 eval_steps_list.extend(eval_steps)
                 structural_drifts.extend(str_drifts)
                 structural_drifts_true.extend(str_drifts_true)
+                print("val_losses,val_ppls, eval_steps_list, structural_drifts, structural_drifts_true ", val_losses,val_ppls, eval_steps_list, structural_drifts, structural_drifts_true)
+                print("val_losses,val_ppls, eval_steps_list, structural_drifts, structural_drifts_true ", len(val_losses),len(val_ppls), len(eval_steps_list), len(structural_drifts), len(structural_drifts_true))
 
                 val_losses_avg.append(val_loss)
                 val_ppls_avg.append(val_ppl_out)
@@ -386,30 +394,30 @@ def pretrain_speaker(
                     break
 
         # save the training metrics
-            df_out = pd.DataFrame({
-                "steps": steps,
-                "losses": speaker_losses,
-                "perplexities": perplexities,
-                "train_type": train_type,
-                "forcing_rate": forcing_rate,
-            })
-            df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False, mode = "a" )
+        df_out = pd.DataFrame({
+            "steps": steps,
+            "losses": speaker_losses,
+            "perplexities": perplexities,
+            "train_type": train_type,
+            "forcing_rate": forcing_rate,
+        })
+        df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False)
 
-            df_val_out = pd.DataFrame({
-                "steps": eval_steps,
-                "val_losses": val_losses,
-                "val_ppls": val_ppls,
-                "structural_drift_true": structural_drifts_true,
-                "structural_drift_pred": structural_drifts,
-            })
-            df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False, mode = "a")
+        df_val_out = pd.DataFrame({
+            "steps": eval_steps_list,
+            "val_losses": val_losses,
+            "val_ppls": val_ppls,
+            "structural_drift_true": structural_drifts_true,
+            "structural_drift_pred": structural_drifts,
+        })
+        df_val_out.to_csv(val_csv_out + "epoch_" + str(epoch) + ".csv", index=False)
 
-            metrics_out = pd.DataFrame({
-                "steps": val_steps,
-                "val_losses_avg": val_losses_avg,
-                "val_ppls_avg": val_ppls_avg,
-            })
-            metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False, mode = "a")
+        metrics_out = pd.DataFrame({
+            "steps": val_steps,
+            "val_losses_avg": val_losses_avg,
+            "val_ppls_avg": val_ppls_avg,
+        })
+        metrics_out.to_csv(csv_metrics + "epoch_" + str(epoch) + ".csv", index=False)
 
         # also break the epochs 
         if early_stopper.early_stop:
