@@ -82,7 +82,16 @@ The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ opt
 \section{Experiments}
 
 \pt{when discussing results and esp PPL, \cite{havrylov2017emergence} also compute encoder PPLs}
-%\subsection{Baseline}
+
+\subsection{Speaker Pretraining}
+As described in Section \ref{model_pretraining}, there are different strategies for pretraining the speaker. Based on initial exploratory experiments reported in Appendex \ref{app:grid_search}, all speakers were pretrained using an exponentially decreasing teacher-forcing rate $0.5^{epoch-1}$.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/coco_pretraining_losses_ppls.png}
+	\caption{A: LSTM cell architecture. B: Image captioner architecture consisting of a CNN image vector extractor (leftmost box) which passes an image vector into an LSTM cell (represented unrolled in time) as initialization of its hidden state.}
+	\label{fig:coco_pretraining}
+\end{figure}  
 
 %\subsubsection{Training}
 %\subsubsection{Results}
