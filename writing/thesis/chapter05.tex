@@ -83,6 +83,8 @@ The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ opt
 
 \pt{when discussing results and esp PPL, \cite{havrylov2017emergence} also compute encoder PPLs}
 
+Provide an overview of conducted experiments and establish their names for easier discussion downstream.
+
 \subsection{Speaker Pretraining}
 As described in Section \ref{model_pretraining}, there are different strategies for pretraining the speaker. Based on initial exploratory experiments reported in Appendex \ref{app:grid_search}, all speakers were pretrained using an exponentially decreasing teacher-forcing rate $0.5^{epoch-1}$.
 
@@ -95,8 +97,10 @@ As described in Section \ref{model_pretraining}, there are different strategies 
 
 
 %\subsubsection{Training}
-\subsubsection{Results}
+\subsection{Results}
 Due to a coding mistake, the language drift and validation loss computed during training of the baseline random pairs experiment on 3dshapes were computed on 50 images from the training dataset, not the validation dataset.
+
+For evaluating the random pairs vs the similar pairs, it would be good to conduct tests with similar and random apirs for both agents, and the especially look at discrete overlaps on the similar pairs, and check if the agents learned to distinguish the images more graunlarly. If not, discuss this as an interesting result, wherein it is actually easier for humans if the discriminative feature is clear as opposed to more distinct images (check if it cognitively plausible though). Find a way to check the granularity of produced descriptions / categories (maybe via simple POS tagging / partial parsing somehow).
 %\subsection{Similar Pairs}
 
 %Describe details on training pair generation here. Mention Xenia's recent paper.
