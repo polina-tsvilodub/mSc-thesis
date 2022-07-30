@@ -85,3 +85,27 @@ class ListenerEncoderCNN(resnet_encoder.EncoderCNN):
         else:
             predicted_max_probs, choices = torch.max(probs, dim = 1)
         return choices, scores_flat        
+
+class FixedRSAListener(nn.Module):
+    """
+    Fixed listener which makes predictions based on a trained speaker model, 
+    i.e., her internal speaker representation. For eeficiency reasons,
+    it is assumed that speaker message likelihoods are computed elsewhere.
+    This is only a wrapper for generating predictions based on the probabilities.
+    """
+
+    def __init__(self):
+        super(FixedRSAListener, self).__init__()
+
+    def forward(self, prob1, prob2):
+        """
+        Choose target based on probabilities prob1 = P(M | image1) and
+        prob2 = P(M | image2), as a sample from the respective categorical distribution.
+        """
+        probs = torch.cat((prob1, prob2), dim = 0).reshape(prob1.shape[0], -1)
+        # print("Porbs shape when cast to tensor ", probs.shape)
+        cat_dist = torch.distributions.categorical.Categorical(logits=probs)
+        choices = cat_dist.sample()
+        # print("Fixed Listener choices: ", choices)
+
+        return choices

@@ -48,6 +48,7 @@ class DriftMeter():
             # set to .eval()
             # self.semantic_encoder.eval()
             self.semantic_decoder.eval()
+            self.hidden_state = self.semantic_decoder.init_hidden(64)
         # softmax for computing the probabilities over the scores
         self.softmax = nn.Softmax(dim=-1)
         
@@ -132,25 +133,33 @@ class DriftMeter():
                 caption = caption.unsqueeze(0)
             else:
                 batch_size = caption.shape[0]
-            hidden = self.semantic_decoder.init_hidden(batch_size)
+            hidden = self.hidden_state #self.semantic_decoder.init_hidden(batch_size)
             scores, h = self.semantic_decoder(image, caption, hidden) # image.unsqueeze(0), caption.unsqueeze(0)
+            # print("raw caption length ", caption[0].shape)
+            
             # retrieve log probs of the target tokens (probs at given indices) 
             scores_prob = self.softmax(scores) 
+            # print("scores shape ", scores_prob[0].shape)
+            # print("scores prob in drift meter: ", scores_prob.shape)
             max_preds, max_inds = torch.max(scores_prob, dim = -1)
+            # print("Max inds in drift meter : ", max_inds.shape)
             # exclude START and END tokens
             sent_probs = []
-            for num, cap in enumerate([1]):
+            for num in list(range(batch_size)):
+                # print("num , cap ", caption[num])
                 sent_probs.append(
                     torch.stack(
-                        [scores_prob[num][i][j] for i, j in enumerate(max_inds[num])]
+                        [scores_prob[num][i][j] for i, j in enumerate(caption[num][:-1])] # cut off hypothesized end token; start token wasnt appended during generation by design  
                     )
                 ) 
 
             # compute log probability of the sentence
             # print("raw word probs", sent_probs)
+            # print("probs stacked before reduction ", torch.stack(sent_probs).shape)
             prob = torch.log(torch.stack(sent_probs)).sum(dim=1)
+            # print("prob ", prob.shape, prob)
         # return softmax output for usage in KL divergence computation
-        return prob.item(), scores_prob
+        return prob, scores_prob
 
     def structural_drift(self, caption):
         """

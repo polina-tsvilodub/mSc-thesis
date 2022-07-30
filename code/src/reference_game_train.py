@@ -6,7 +6,7 @@ from utils.build_dataset import make_dataset, get_loader, get_loader_3dshapes
 from utils.download import maybe_download_and_extract
 from utils.train import pretrain_speaker
 from utils.early_stopping import EarlyStopping
-from reference_game_utils.train import play_game
+from reference_game_utils.train import play_game, play_game_wFixedListener
 import torch
 from torchvision import transforms
 import torch.nn as nn
@@ -20,9 +20,13 @@ import argparse
 
 from dotenv import load_dotenv
 
+# set random seed
+torch.manual_seed(1234)
+random.seed(1234)
+
 load_dotenv()
 
-ex = sacred.Experiment("coco_hyperparameter_search_Lf_only")
+ex = sacred.Experiment("3dshapes_final_baseline_075_49_random")
 usr = os.getenv("MONGO_INITDB_ROOT_USERNAME")
 pw = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 db = os.getenv("MONGO_DATABASE")
@@ -54,6 +58,7 @@ def train_reference_game(
     ENTROPY_WEIGHT,
     USE_ENCODE_LS,
     DEBUG=False,
+    LISTENER_TYPE="joint",
     **kwargs
 ):
     """
@@ -148,6 +153,10 @@ def train_reference_game(
             num_imgs=int(NUM_IMG),
             pairs=PAIRS,
         )
+        # check if number of val instances needs to be adjusted
+        if PAIRS == "random":
+            NUM_IMG = 250
+        
         data_loader_val = get_loader(
             transform=transform_train,
             dataset_path=VAL_DATASET,
@@ -158,7 +167,7 @@ def train_reference_game(
             vocab_from_file=True,
             download_dir=DOWNLOAD_DIR_TRAIN,
             embedded_imgs=embedded_imgs,
-            num_imgs=int(250),
+            num_imgs=int(NUM_IMG),
             pairs=PAIRS,
         )
         print("NUMBER OF VALIDATION IMAGES ", len(data_loader_val.dataset.ids))
@@ -200,8 +209,8 @@ def train_reference_game(
             vocab_from_file=VOCAB_FROM_FILE,
             download_dir=DOWNLOAD_DIR_TRAIN,
             embedded_imgs=embedded_imgs,
-            dataset_path=DATASET,
-            num_imgs=int(250),
+            dataset_path=VAL_DATASET,
+            num_imgs=int(50),
             pairs=PAIRS,
         )
     
@@ -248,34 +257,68 @@ def train_reference_game(
     print("TOTAL STEPS:", total_steps)
 
     # training loop
-    loss_speaker_train, loss_str_train, loss_f_train, ppl_train, loss_l_train,\
-        acc_train, str_drift_pred, str_drift_true, sem_drift_pred, sem_drift_true,\
-        disc_overlaps, cont_overlaps, img_sims, epochs_metrics, loss_str_val_all, ppl_val_all,\
-        loss_val_avg, ppl_val_avg, val_steps = play_game(
-            log_file=LOG_FILE,
-            num_epochs=EPOCHS,
-            total_steps=total_steps,
-            data_loader=data_loader_train, 
-            data_loader_val=data_loader_val,
-            speaker_decoder=speaker_decoder,
-            listener_encoder=listener_encoder, 
-            listener_rnn=listener_rnn,
-            criterion=criterion,
-            weights_path=WEIGHTS_PATH,
-            print_every=PRINT_EVERY,
-            save_every=SAVE_EVERY,
-            train_losses_file=TRAIN_LOSSES_FILE,
-            train_metrics_file=TRAIN_METRICS_FILE,
-            val_losses_file=VAL_LOSSES_FILE,
-            val_metrics_file=VAL_METRICS_FILE,
-            experiment=EXPERIMENT,
-            lambda_s=float(STRUCTURAL_WEIGHT),
-            pretrained_decoder_file=SPEAKER_PRETRAINED_FILE,
-            decoding_strategy=DECODING_STRATEGY,
-            mean_baseline=MEAN_BASELINE,
-            entropy_weight=float(ENTROPY_WEIGHT),
-            use_encode_ls=USE_ENCODE_LS,
-        )
+    if LISTENER_TYPE == "joint":
+        loss_speaker_train, loss_str_train, loss_f_train, ppl_train, loss_l_train,\
+            acc_train, str_drift_pred, str_drift_true, sem_drift_pred, sem_drift_true,\
+            disc_overlaps, cont_overlaps, img_sims, epochs_metrics, loss_str_val_all, ppl_val_all,\
+            loss_val_avg, ppl_val_avg, val_steps = play_game(
+                log_file=LOG_FILE,
+                num_epochs=EPOCHS,
+                total_steps=total_steps,
+                data_loader=data_loader_train, 
+                data_loader_val=data_loader_val,
+                speaker_decoder=speaker_decoder,
+                listener_encoder=listener_encoder, 
+                listener_rnn=listener_rnn,
+                criterion=criterion,
+                weights_path=WEIGHTS_PATH,
+                print_every=PRINT_EVERY,
+                save_every=SAVE_EVERY,
+                train_losses_file=TRAIN_LOSSES_FILE,
+                train_metrics_file=TRAIN_METRICS_FILE,
+                val_losses_file=VAL_LOSSES_FILE,
+                val_metrics_file=VAL_METRICS_FILE,
+                experiment=EXPERIMENT,
+                lambda_s=float(STRUCTURAL_WEIGHT),
+                pretrained_decoder_file=SPEAKER_PRETRAINED_FILE,
+                decoding_strategy=DECODING_STRATEGY,
+                mean_baseline=MEAN_BASELINE,
+                entropy_weight=float(ENTROPY_WEIGHT),
+                use_encode_ls=USE_ENCODE_LS,
+                pairs=PAIRS,
+            )
+    elif LISTENER_TYPE == "fixed":
+        loss_speaker_train, loss_str_train, loss_f_train, ppl_train, loss_l_train,\
+            acc_train, str_drift_pred, str_drift_true, sem_drift_pred, sem_drift_true,\
+            disc_overlaps, cont_overlaps, img_sims, epochs_metrics, loss_str_val_all, ppl_val_all,\
+            loss_val_avg, ppl_val_avg, val_steps = play_game_wFixedListener(
+                log_file=LOG_FILE,
+                num_epochs=EPOCHS,
+                total_steps=total_steps,
+                data_loader=data_loader_train, 
+                data_loader_val=data_loader_val,
+                speaker_decoder=speaker_decoder,
+                listener_encoder=listener_encoder, 
+                listener_rnn=listener_rnn,
+                criterion=criterion,
+                weights_path=WEIGHTS_PATH,
+                print_every=PRINT_EVERY,
+                save_every=SAVE_EVERY,
+                train_losses_file=TRAIN_LOSSES_FILE,
+                train_metrics_file=TRAIN_METRICS_FILE,
+                val_losses_file=VAL_LOSSES_FILE,
+                val_metrics_file=VAL_METRICS_FILE,
+                experiment=EXPERIMENT,
+                lambda_s=float(STRUCTURAL_WEIGHT),
+                pretrained_decoder_file=SPEAKER_PRETRAINED_FILE,
+                decoding_strategy=DECODING_STRATEGY,
+                mean_baseline=MEAN_BASELINE,
+                entropy_weight=float(ENTROPY_WEIGHT),
+                use_encode_ls=USE_ENCODE_LS,
+                pairs=PAIRS,
+            )
+    else:
+        raise ValueError(f"{LISTENER_TYPE} listener is not supported!")
     if not DEBUG:
         # dump training stats to sacred db
         for i in range(len(loss_speaker_train)):
@@ -332,6 +375,7 @@ if __name__ == "__main__":
     parser.add_argument("-s_pre", "--speaker_pretrained", help = "path to pretrained speaker decoder model")
     parser.add_argument("-n_img", "--num_images", help = "number of images to be used")
     parser.add_argument("-p", "--pairs", help = "type of target/distractor pairs (similar, random)", choices=["random", "similar"])
+    parser.add_argument("-l_t", "--listener_type", help = "type of listener model", choices=["joint", "fixed"])
     
 
     # grid search specific parameters
@@ -370,7 +414,7 @@ if __name__ == "__main__":
             MEAN_BASELINE=args.mean_baseline
             ENTROPY_WEIGHT=args.entropy_weight
             USE_ENCODE_LS=args.loss_s_comp
-        
+            LISTENER_TYPE=args.listener_type
         ex.run()
     else:
         # just execute train loop

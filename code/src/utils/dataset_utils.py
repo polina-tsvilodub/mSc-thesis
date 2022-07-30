@@ -60,7 +60,7 @@ class COCOCaptionsDataset(Dataset):
             f = json.load(fp)
         self.imgs2cats = f
         # read imgID to annIDs mapping file
-        with open("imgID2annID.json", "r") as fp:
+        with open("../imgID2annID.json", "r") as fp:
             f = json.load(fp)
         self.imgID2annID = f
         
@@ -72,12 +72,12 @@ class COCOCaptionsDataset(Dataset):
             # shuffle(_ids)
             ####
             # read imd2annID file. select N images, get all ann IDs => ids
-            with open("imgID2annID.json", "r") as fp:
+            with open("../imgID2annID.json", "r") as fp:
                 f = json.load(fp)
             if pairs == "similar":
-                imgIDs4train = torch.load("../../../data/ref_game_similar_img_IDs_filtered.pt")[:30000] 
+                imgIDs4train = torch.load("../../../data/ref_game_similar_img_IDs_filtered_str.pt")[:30000] 
             else:
-                imgIDs4train = list(f.keys())[:30000] # 
+                imgIDs4train = list(f.keys())[60000:] # 
             _ids = [(f[i], i) for i in imgIDs4train] # list of tuples of shape (annID_lst, imgID)
             shuffle(_ids)
             _ann_ids_flat = [i for lst in _ids for i in lst[0]]
@@ -90,10 +90,13 @@ class COCOCaptionsDataset(Dataset):
                 else:
                     self.ids = torch.load(dataset_path).tolist()
             else:
-                self.ids = torch.load("../train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
-            
-            if dataset_path == "./val_split_IDs_from_COCO_train_tensor.pt":
+                # self.ids = torch.load("../train_logs/pretrain_img_IDs_2imgs_512dim.pt").tolist() #_ann_ids_flat #torch.load("pretrain_img_IDs_2imgs_512dim_100000imgs.pt").tolist()#_ids[:70000] list(self.coco.anns.keys()) #
+                self.ids = _ann_ids_flat
+
+            if dataset_path == "../val_split_IDs_from_COCO_train_tensor.pt": # for speaker evaluation
                 self._img_ids_flat = [self.coco.loadAnns(i)[0]['image_id'] for i in self.ids]
+            elif dataset_path == ".../../../data/ref_game_similar_ann_IDs_flat_filtered_val_tensor.pt":
+                self._img_ids_flat = torch.load("../../../data/ref_game_similar_img_IDs_flat_filtered_val_tensor.pt").tolist()    
             else:   
                 self._img_ids_flat = [i[1] for i in _ids for x in i[0]]
             
@@ -111,7 +114,7 @@ class COCOCaptionsDataset(Dataset):
             # torch.save(torch.tensor(self.ids), "train_logs/ref-game_img_IDs_15000_coco_pretrainGrid_decr05.pt")
             # torch.save(torch.tensor(self.ids), "train_logs/15000_coco_hyperparams_search_Lf_sampling_tracked.pt")
             
-            # torch.save(torch.tensor(self.ids), "train_logs/final/pretrain_img_IDs_teacher_forcing_desc05_pureDecoding_vocab4000_padding_cont_4.pt")
+            # torch.save(torch.tensor(self.ids), "train_logs/final/ref_game_img_IDs_coco_pure_decoding_Ls075_4000vocab_similar.pt")
 
         elif mode == "val":
             with open("./imgID2annID_val.json", "r") as fp:
@@ -244,11 +247,11 @@ class COCOCaptionsDataset(Dataset):
         # consisiting of same images
         imgIDs_t = [self._img_ids_flat[i] for i in indices_t]
         possible_inds_dist = [x for x in np.arange(len(self.caption_lengths)) if x not in indices_t and self._img_ids_flat[x] not in imgIDs_t]
-        indices_d = list(np.random.choice(possible_inds_dist, size=self.batch_size, replace=False))
-        
+        indices_d = possible_inds_dist[:self.batch_size] #list(np.random.choice(possible_inds_dist, size=self.batch_size, replace=False))
+        # print("indices_d", indices_d)
         return list(zip(indices_t, indices_d))
 
-    def get_func_similar_train_indices(self):
+    def get_func_similar_train_indices(self, i_step):
         """
         Simple POC function returning two lists on indices for the functional training. 
         Returns a list of inidces for targets and a list f indices for distractors. 
@@ -268,35 +271,59 @@ class COCOCaptionsDataset(Dataset):
         distractor_ann_inds = []
         
         for num, c in enumerate(targets_categories):
-            print("Target categories: ", c)
+            # print("Target categories: ", c)
             # align the target and distractor categories 
             possible_inds = []
             # get distractor images matching in at least three of the target categories
             for i, c_t in enumerate(c["categories"][:3]):
-                print("I, c_t ", i, c_t)
+                # print("I, c_t ", i, c_t)
                 if i == 0:
-                    possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(self._img_ids_flat) - set([self._img_ids_flat[i] for i in indices_t]))) # remove used target img ids here to avoid having targets and dists from same images
+                    possible_inds = list(set.intersection(set([str(t) for t in self.categories2image[str(c_t)]]), set(self._img_ids_flat) - set([self._img_ids_flat[i] for i in indices_t]))) # remove used target img ids here to avoid having targets and dists from same images
                 else:
-                    possible_inds = list(set.intersection(set(self.categories2image[str(c_t)]), set(possible_inds)))
+                    possible_inds = list(set.intersection(set([str(t) for t in self.categories2image[str(c_t)]]), set(possible_inds)))
             
-            print("num of possible inds ", len(possible_inds))
-            dist_ind = possible_inds[0]
-            print("Dist ind ", dist_ind)
-            j = 1
-            while dist_ind == indices_t[num]:
-                dist_ind = possible_inds[j]
-                j += 1 # TODO check it does not get out of range
-            distractor_inds.append(dist_ind)   
-            print("Dist ind ", dist_ind)
-            # convert distractor image id to index of the corresponding annotation ID
-            distractor_ann_ind = np.where([self._img_ids_flat[i] == dist_ind for i in range(len(self._img_ids_flat))])[0]
-            print("distractor ann ind ", distractor_ann_ind)
-            distractor_ann_inds.append(distractor_ann_ind[0])
-        print("Distractor inds final ", distractor_inds)
-        print("Distractor ann inds final ", distractor_ann_inds)
+            # print("num of possible inds ", len(possible_inds))
+            j = 0 
+            distractor_ann_ind = []
+            try:
+                while len(distractor_ann_ind) < 1 and j < len(possible_inds) - 1:
+                    j += 1
+                    dist_ind = possible_inds[j]
+
+                    distractor_inds.append(dist_ind)   
+                    print("Dist ind ", dist_ind)
+                    # convert distractor image id to index of the corresponding annotation ID
+                    distractor_ann_ind = np.where([self._img_ids_flat[i] == str(dist_ind) for i in range(len(self._img_ids_flat))])[0]
+                    # print("distractor ann ind ", distractor_ann_ind)
+                    try:
+                        distractor_ann_inds.append(distractor_ann_ind[0])
+                    except IndexError:
+                        print("Except in while")
+                        continue
+
+            except IndexError:
+                raise Exception
+                # quick and dirty : random distractors
+            #     print("INDEX ERROR")
+            #     possible_inds = np.random.choice(self.categories2image[str(c_t)], 2, replace = False)
+            #     dist_ind = possible_inds[0]
+            #     print("Dist ind ", dist_ind)
+            # j = 1
+            # while dist_ind == indices_t[num]:
+            #     print("Same index")
+            #     # dist_ind = possible_inds[j]
+            #     # j += 1 # TODO check it does not get out of range
+            # distractor_inds.append(dist_ind)   
+            # print("Dist ind ", dist_ind)
+            # # convert distractor image id to index of the corresponding annotation ID
+            # distractor_ann_ind = np.where([self._img_ids_flat[i] == str(dist_ind) for i in range(len(self._img_ids_flat))])[0]
+            # # print("distractor ann ind ", distractor_ann_ind)
+            # distractor_ann_inds.append(distractor_ann_ind[0])
+        # print("Distractor inds final ", distractor_inds)
+        # print("Distractor ann inds final ", distractor_ann_inds)
     
         inds_tuples = list(zip(indices_t, distractor_ann_inds))
-        print("inds_tuples ", inds_tuples)
+        # print("inds_tuples ", inds_tuples)
         return inds_tuples
 
 
@@ -419,7 +446,7 @@ class threeDshapes_Dataset(Dataset):
             # print("Type check before saving: ", type(imgIDs4train[0]))
             # torch.save(imgIDs4train, "ref_game_img_IDs_unique_imgIDs4train_3dshapes.pt")
             # torch.save(self._img_ids_flat, "pretrain_img_IDs_flat_3dshapes_short.pt")
-            # torch.save(self.ids, "train_logs/final/pretrain_img_IDs_3dshapes_exh_teacher_forcing_desc05_pureDecoding_vocab49_padding_cont4.pt")
+            # torch.save(self.ids, "train_logs/final/ref_game_3dshapes_fixedListener_baseline_random_pure_Ls075.pt")
             
         if mode == "val":
             pass
@@ -514,7 +541,7 @@ class threeDshapes_Dataset(Dataset):
         
         return target_image, distractor_image, target_features, distractor_features, targets_list, text_list
 
-    def get_func_similar_train_indices(self):
+    def get_func_similar_train_indices(self, i_step):
             """
             Simple POC function returning two lists on indices for the functional training. 
             Returns a list of inidces for targets and a list f indices for distractors. 
@@ -528,12 +555,14 @@ class threeDshapes_Dataset(Dataset):
 
             # get ann / img ID slice
             target_img_ids = self._img_ids_flat[(i_step-1)*self.batch_size : i_step*self.batch_size]
+            print("target_img_ids", target_img_ids)
             target_labels = [self.numeric_labels[int(i)] for i in target_img_ids]
-            
+            print("target_labels", target_labels)
             # select at random 3 categories along which the image should be constant in this batch
             sel_categories = np.random.choice(list(self.categories.keys()), size=3, replace=False)
             sel_categories_inds = [list(self.categories.keys()).index(c) for c in sel_categories]
             print("Selected categories: ", sel_categories)
+            print("Selected categories inds: ", sel_categories_inds)
             # create a container for the distractor indices
             distractor_inds = []
             
@@ -541,7 +570,7 @@ class threeDshapes_Dataset(Dataset):
             
             # iterate over each sample to find the right distractor
             for lbl in target_labels:
-                print("Lbl ", lbl)
+                # print("Lbl ", lbl)
                 # create a placeholder for intersecting the indices for that 
                 possible_inds = []
                 # get values of sampled fixed categories and matching distractor indices
@@ -549,23 +578,36 @@ class threeDshapes_Dataset(Dataset):
                     print("Ind retrieval loop for lbl: ", i, c_i)
                     if i == 0:
                         possible_inds = self.cats2imgIDs[c_i[0]][str(lbl[c_i[1]])]
+                        print("possible inds len ", len(possible_inds))
                     else:
                         possible_inds = list(set.intersection(set(self.cats2imgIDs[c_i[0]][str(lbl[c_i[1]])]), set(possible_inds)))
+                        print("possible inds len ", len(possible_inds))
                 # get one distractor 
-                distractor_img_ind = possible_inds[0]
-                print("distractor_img_ind", distractor_img_ind)
-                # convert retrieved distractor image index into distractor annotation index
-                distractor_ann_ind = np.where([self._img_ids_flat[i] == str(distractor_img_ind) for i in range(len(self._img_ids_flat))])[0]
-                print("distractor_ann_id", distractor_ann_ind)
-                distractor_inds.append(int(distractor_ann_ind[0]))
+                j = 0
+                distractor_ann_ind = []
+                try:
+                    while len(distractor_ann_ind) < 1 and j < len(possible_inds)-1:
+                        print("doing while")
+                        j += 1
+                        distractor_img_ind = possible_inds[j]
+                        print("distractor_img_ind", distractor_img_ind)
+                        # convert retrieved distractor image index into distractor annotation index
+                        distractor_ann_ind = np.where([self._img_ids_flat[i] == str(distractor_img_ind) for i in range(len(self._img_ids_flat))])[0]
+                        print("distractor_ann_id", distractor_ann_ind)
+                        try:
+                            print("trying")
+                            distractor_inds.append(int(distractor_ann_ind[0]))
+                        except IndexError:
+                            print("except")
+                            continue        
+                except IndexError:
+                    raise Exception                            
+            # print("Selected cats: ", sel_categories)
+            # print("Number of distractor inds: ", len(distractor_inds))
             
-                            
-            print("Selected cats: ", sel_categories)
-            print("Number of distractor inds: ", len(distractor_inds))
-            
-            print("target img ind: ", target_img_ids)
+            # print("target img ind: ", target_img_ids)
             inds_tuples = list(zip(list(range((i_step-1)*self.batch_size, i_step*self.batch_size)), distractor_inds)) #list(zip(indices_t, indices_d))
-            print("tuples: ", inds_tuples)
+            # print("tuples: ", inds_tuples)
             # double check that target and distractor aren't the same image
             
             return inds_tuples

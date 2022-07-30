@@ -129,7 +129,11 @@ def get_loader(transform,
         # Randomly sample a caption length, and sample indices with that length.
             indices = dataset.get_func_train_indices(1)
         else:
-            indices = dataset.get_func_similar_train_indices()
+            if dataset_path != "":
+                print("selected standard indexing in val loader")
+                indices = dataset.get_func_train_indices(1)
+            else:
+                indices = dataset.get_func_similar_train_indices(1)
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.
@@ -145,7 +149,11 @@ def get_loader(transform,
             # Randomly sample a caption length, and sample indices with that length.
             indices = dataset.get_func_train_indices(1)
         else:
-            indices = dataset.get_func_similar_train_indices()
+            if dataset_path != "":
+                print("selected standard indexing in val loader")
+                indices = dataset.get_func_train_indices(1)
+            else:
+                indices = dataset.get_func_similar_train_indices(1)
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.
@@ -247,7 +255,14 @@ def get_loader_3dshapes(transform,
 
     if mode == 'train':
         # Randomly sample a caption length, and sample indices with that length.
-        indices = dataset.get_func_train_indices(1)
+        if pairs != "similar":
+            indices = dataset.get_func_train_indices(1)
+        else:
+            if dataset_path != "train_logs/val_img_IDs_unique_3dshapes_randomSample10000_list_str.pt":
+                indices = dataset.get_func_similar_train_indices(1)
+            else:
+                print("getting standard loader for val split")
+                indices = dataset.get_func_train_indices(1)
         # Create and assign a batch sampler to retrieve a batch with the sampled indices.
         initial_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices=indices)
         # data loader for COCO dataset.

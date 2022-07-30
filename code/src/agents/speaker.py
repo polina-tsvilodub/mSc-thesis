@@ -2,7 +2,11 @@ import torch
 import torch.nn as nn
 import torchvision.models as models 
 import numpy as np
+import random
 
+# set random seed
+torch.manual_seed(1234)
+random.seed(1234)
 
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, visual_embed_size, batch_size=64, num_layers=1):
