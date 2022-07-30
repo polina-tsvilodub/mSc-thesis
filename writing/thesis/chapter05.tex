@@ -131,16 +131,16 @@ Table with image caption quality metrics of the pretrained speakers. Add same me
 	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
 		\hline
 		\textbf{Model name}                                    & \textbf{log P(m)} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Listener acc (random)} & \textbf{Listener acc (similar)} \\ \hline
-		Pretrained MS speaker                             &                   &                        &                      &                      & 0.953 (random listeners)                 &                                           \\ \hline
+		Pretrained MS speaker               &       -131.760            &           -63.765             &          0.766            &           0.004           & 0.953 (random listeners)                 &                                           \\ \hline
 		MS Baseline, random pairs, Ls = 0      &                   &                        &                      &                      &                                          &                                           \\ \hline
 		MS Baseline, random pairs, Ls = 0.5    &                   &                        &                      &                      &                                          &                                           \\ \hline
-		MS Baseline, random pairs, Ls = 0.75   &                   &                        &                      &                      & 0.953                                    &                                           \\ \hline
+		MS Baseline, random pairs, Ls = 0.75   &       -136.998            &              -74.039          &        0.813              &        0.002              & 0.953                                    &                                           \\ \hline
 		MS Baseline, similar pairs, Ls = 0.75  &                   &                        &                      &                      &                                          &                                           \\ \hline
-		Pretrained 3D speaker                            &                   &                        &                      &                      & 0.953 (random listeners)                 & 0.881 (similar listeners)                 \\ \hline
+		Pretrained 3D speaker                            &       -194.657            &         -138.227               &        5.781              &      0.029                & 0.953 (random listeners)                 & 0.881 (similar listeners)                 \\ \hline
 		3D Baseline, random pairs, Ls = 0     &                   &                        &                      &                      &                                          &                                           \\ \hline
 		3D Baseline, random pairs, Ls = 0.5   &                   &                        &                      &                      &                                          &                                           \\ \hline
-		3D Baseline, random pairs, Ls = 0.75  &                   &                        &                      &                      & 0.942                                    &                                           \\ \hline
-		3D Baseline, similar pairs, Ls = 0.75 &                   &                        &                      &                      & 0.878                                    &                                           \\ \hline
+		3D Baseline, random pairs, Ls = 0.75  &       -198.858        &           -133.919           &          5.031            &         0.001             & 0.942                                    &                                           \\ \hline
+		3D Baseline, similar pairs, Ls = 0.75\footnote{The speaker is evaluated on random pairs here} &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &                                           \\ \hline
 		&                   &                        &                      &                      &                                          &                                           \\ \hline
 	\end{tabularx}
 \caption{\label{tab:drift_metrics_basic} Language drift metrics and listener test accuracies on different pairs. 
@@ -167,6 +167,15 @@ For evaluating the random pairs vs the similar pairs, it would be good to conduc
 \subsection{3Dshapes: Baseline Experiments}
 
 \subsection{3DShapes: Similar Pairs Experiments}
+
+In this experiment, the target-distractor pairs consisted of similar images. \pt{add particular operationalization} One of the hypotheses addressed in this experiment is whether the agents are able to flexibly adapt the specificity of their messages, compared to the random pairs baseline experiment \pt{H number}. This was approximately investigated via the distribution of part-of-speech tags in a test set of 1000 pairs for which messages were generated. The distributions are compared when the 1000 pairs are random versus similar. The results for 1000 random pairs are shown in Figure  \ref{fig:3dshapes_pos}. Based on visual inspection, it can be seen that the distribution of the token categories, especially the modifier tokens like color or size adjectives did not shift significantly. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_random_vs_similar_POS_counts.png}
+	\caption{POS counts for random 1000 test image pairs. }
+	\label{fig:3dshapes_pos}
+\end{figure}
 
 \subsection{3Dshapes: Fixed Listener Experiments}
 
