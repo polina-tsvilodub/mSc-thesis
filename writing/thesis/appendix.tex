@@ -4,8 +4,9 @@ The basic-level categories annotated in the MS COCO Captions dataset are: person
 
 
 \section{REINFORCE Pseudo-algorithm}
+\pt{TODO}
 
 \section{Speaker Architecture Grid Search}
 \label{app:grid_search}
 
-For conducting the experiments in this thesis, speakers pretrained with different following approaches were considered during initial exploratory grid searches: pure teacher forcing pretraining, constant 0.5 rate teacher forcing, linear adaptive teacher forcing rate (decreasing by the factor 0.5 in each training epoch, pure and greede decoding), scheduled sampling (with pure or exponential decoding, k = 30 and k = 150) and top-k sampling with a temperature of 2
+For conducting the experiments in this thesis, speakers pretrained with different following approaches were considered during initial exploratory grid searches: pure teacher forcing pretraining, constant 0.5 rate teacher forcing, adaptive teacher forcing rate (decreasing by the factor 0.5 in each training epoch, pure and greedy decoding), scheduled sampling (with pure or exponential decoding, k = 30 and k = 150) and top-k sampling with a temperature of 2.
