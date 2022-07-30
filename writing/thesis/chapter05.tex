@@ -10,7 +10,7 @@ Both datasets are used for constructing the reference game which procedes in the
 \begin{enumerate}
 	\item A random image is sampled from the dataset as the target $t$.
 	\item A second image is sampled as the distractor $d$ (either at random or following constraints; see below for details).
-	\item The speaker agent $S$ recieves both images, the target image being marked respectivaly. It emits a message $m$ describing the target.
+	\item The speaker agent $S$ recieves both images, the target image being marked, respectively. This is accomplished by always passing the target as the first image. It emits a message $m$ describing the target.
 	\item The listener agent $L$ recieves both images along with the message $m$, but doesn't know which image is the target.
 	\item The listener selects the target image based on the message. If the selection was correct, both agents receive a positive reward, and a negative one otherwise.	 
 \end{enumerate}
@@ -18,7 +18,7 @@ Both datasets are used for constructing the reference game which procedes in the
 The next two sections describe in detail the properties of the datasets and how they were preprocessed for the experiments.
 
 \subsection{MS COCO}
-The MS COCO Captions dataset \parencite{chen2015microsoft} contains images and respective annotations from the 2014 split of the MS COCO dataset \parencite{lin2014microsoft}. The dataset contains 82,783 images in the training split, each associated with around five human-annoated caption, resulting in a total of 414,113 unique image-caption pairs. The validation split contains 40,504 images, annotated with a total of 202,654 human-produced captions. The respective dataset splits and annotations were downloaded from \url{https://cocodataset.org/#download}.
+The MS COCO Captions dataset \parencite{chen2015microsoft} contains images and respective annotations from the 2014 split of the MS COCO dataset \parencite{lin2014microsoft}. Figure \ref{fig:coco_example} presents an example image and annotations form the dataset. The dataset contains 82,783 images in the training split, each associated with around five human-annoated caption, resulting in a total of 414,113 unique image-caption pairs. The validation split contains 40,504 images, annotated with a total of 202,654 human-produced captions. The respective dataset splits and annotations were downloaded from \url{https://cocodataset.org/#download}.
 Furthermore, each image is annotated with bounding boxes of objects and category labels for the depicted objects. There are 80 different basic-level annotation categories, listed in the Appendix \ref{appendix}. These 80 categories are grouped into 12 superordinate categories: person, accessory, indoor, appliance, food, kitchen, sports, furniture, outdoor, animal, electronic and vehicle.
 On average, 2.9 basic-level categories and 2.3 superordinate categories occur per image.
 \pt{There will be a table with super-basic category mappings and counts of at least each super category}.
@@ -29,55 +29,69 @@ The final size of the vocabulary $V$ used in the experiments is 4054, including 
 The minimal caption length occuring in the dataset is six tokens, the maximal length is 57 tokens. The mean caption length is 11.3 tokens (based on tokenization with the basic English tokenizer provided by the \texttt{torchtext} package). Since recurrent neural networks may have issues with learning very long sequences \pt{REF}, captions exceeding the length of 15 tokens were truncated. This cut-off length was chosen because it is the minimal length at which over 99\% of the captions didn't have to be truncated. \pt{maybe include a density plot, side by side with the vocab count density one}
 During preprocessing, the captions were lowercased, tokenized with the \texttt{torchtext} tokenizer mentioned above and mapped to numerical indices.  The resulting vocabulary is shared between the speaker and listener agents in all experiments. 
 
-For training the agents in the baseline reference game and the fixed-listener experiment, the same 100,000 image-caption pairs sampled at random were used. In this split, there are 61,993 unique images, out of which 33,051 images only occur once. 68 occur five times in the data subset; all other images occur less often. Around 7,000 image-caption pairs from the validation set were used for testing purposes. 
-The following preprocessing steps were applied to all images before training: the images were resized to 256 pixels, random $224\times224$ pixel crops were taken, images were horizontally flipped with a probability of 0.5 and each RGB channel was normalized using values expected by the pretrained ResNet50 module (see below for details).
+The following preprocessing steps were applied to all images before training: the images were resized to 256 pixels, random $224\times224$ pixel crops were taken, images were horizontally flipped with a probability of 0.5 and each RGB channel was normalized using values expected by the pretrained ResNet50 module (see below for details). \pt{where?}
 
 For the baseline experiments, the training pairs of images were sampled at random. In contrast, for the experiment involving similar training pairs the images were sampled such that the distractor depicted objects similar to the target. This was controlled via the category annotations accompanying each image. The training pairs were constructed so that they were annotated with at least three same basic-level categories, or, in case there were less than three, if all annotated categories matched.
 
 \subsection{3Dshapes}
 The 3Dshapes dataset introduced by \textcite{burgess20183d} contains 480.000 synthetically generated images. These images depict different three-dimensional geometric objects in abstract space, systematically varying along six different features. These features are the color of the ground on which the object resides (ten values), the color of the background walls (ten values), the color of the object itself (ten values), the type of object (four values), its size (eight values) and its position within the depicted room (15 values). %\pt{Table X depicts / describes the possible values of each dimension}. 
-The $64\times64$ pixel images are labeled with six-dimensional vaectors, each position representing the value of one of the six features. 
+The $64\times64$ pixel images are labeled with six-dimensional vectors, each position representing the value of one of the six features. 
 \pt{Show some examples}.
 The dataset was downloaded from \url{https://storage.cloud.google.com/3d-shapes/3dshapes.h5}.
 %\pt{XXX images were used for training the agents in the 3Dshapes experiment, and YYY images were used for testing.}
 
 \subsubsection{Caption Generation}
+
+The dataset provides symbolic feature labels of the images. However, since the goal of presented work is training artificial agents to use natural language in communication, English captions were generated for this dataset. More specifically, two datasets were generated. The first dataset is tailored towards studying the effect of including maximally exhaustive image descriptions in the training data. Therefore, generated captions include natural language descriptions of all six features and their values, appearing in different syntactic constructions. \pt{Figure XY shows an example image along with sample generated captions.} The syntactic variations were introduced in order to avoid potential effects of order in which descriptions of certain features might occur.
+The captions were generated by constructing generation rules and sampling all possible resulting sentences using the \texttt{nltk} package \parencite{bird2006nltk}. The resulting dataset contains \pt{check: 48} synonymous captions per image, five of which are sampled at random for training in order to match the MS COCO conditions. The captions were build using a vocabulary of 49 tokens. Maximal caption length is 25 tokens, and mean caption length is \pt{TBD}. 
+\pt{The most prominent grammatical structure in the dataset was...}
+
+The second dataset provides the comparison for investigating the role of having exhaustive captions in the training dataset, while keeping constant the vocabulary size. That is, this dataset contains \textit{non-}exhaustive captions which only mention three out of six features of each image. These captions were generated using the same procedure. \pt{XY} captions per image were generated. The maximal length in this dataset is ...; the average length is ... .
+
+\pt{potential confound with length.}
+The comparability of the vocabulary sizes is important in that it determines the difficulty of learning the policy with REINFORCE which represents the functional learning in these experiments. \pt{check if too ooc}
+
+The generation rules and the corresponding code can be accessed under \url{https://github.com/polina-tsvilodub/3dshapes-language}.
+
 \pt{TBD. Cite Bruni's paper with the grammar stuff.}
+
+Akin to MS COCO experiments, baseline experiments are conducted on random target-distractor pairs. For the similar pairs experiment, the distractor is chosen so that it matches the target with respect to at least three out of six features. For instance, if the target depicts a tiny red cube in the left corner on yellow floor and with blue background, the distractor could depict a tiny blue cube in the right corner on yellow floor and with green background.
+
 %This dataset was chosen due to the systematicity of its content , allowing to generate natural language captions for each image which would exhaustively describe all features of the images. Since no such captions exist to the author's knowldege, they are generated as part of this thesis. To this end, a base context-free grammar (CFG) containing production rules for captions was manually created. The syntactic rules were constructed on the basis of examples of captions created by the author for samples from the dataset. Each caption must contain descriptions of all six feature dimensions. The terminal production rules mapping the pre-terminal to natural language labels are chosen for each image based on its unique feature value configuration. For each image, \pt{X captions are sampled from all the possible productions allowed by the grammar}.
 
 %\pt{Discuss aspects to be taken care of, like vocab size, caption lengths etc}.
 
 \section{Architecture}
-The architecture of the agents follows \textcite{lazaridou2020multi}, except minor details to be explained below. \textcite{lazaridou2020multi} explore different ways to parametrize the speaker agent, and the current work replicates the ``multi-task learning'' parametrization (p. 5). This choice is motivated by the fact that among their architectures, this is the only one where the speaker agent learns to produce messages and its core image captioning capability while having access to both the target and the distractors, as opposed to models relying on sampling captions from a pretrained single-image captioning models.\footnote{I think that the multi-task learning set up by \textcite{lazaridou2020multi} really doesn't use pretraining---see their Appendix A ResNet module note.} 
+The architecture of the agents follows \textcite{lazaridou2020multi}, except minor details to be explained below. As described in Chapter \ref{chapter03}, \textcite{lazaridou2020multi} explore different ways to parametrize the speaker agent, and the current work replicates the ``multi-task learning'' parametrization (p. 5). This choice is motivated by the fact that among their architectures, this is the only one where the speaker agent learns to produce messages and its core image captioning capability while having access to both the target and the distractors, as opposed to models relying on sampling captions from a pretrained single-image captioning models. The chosen architecture is used in all experiments.
 
 Both agents have two components: a visual embedding module which takes as input the target and distractor images, and a language module. More specifically, the visual module for both agents embeds image features which were extracted using the same pre-trained ResNet50 model \parencite{he2016deep}. The weights were accessed through the \texttt{torchvision.models} API \parencite{marcel2010torchvision}. Features from all training images of the dataset were extracted and saved and then retrieved when training all agents. 
 The language module differs for the two agents, so details are provided below. 
-The code for all experiments can be found under \url{https://github.com/polina-tsvilodub/mSc-thesis/tree/refGame-noPretrain-token0}. 
+The code for all experiments can be found under \url{https://github.com/polina-tsvilodub/mSc-thesis}. 
 
 \subsection{Speaker}
-The speaker receives as input tuples \texttt{(targets, distractors)}, where \texttt{targets} as well as \texttt{distractors} are features extracted from the ResNet50 for the sampled pairs, respectively. That is, the speaker knows which of the the two images in a given iteration of the reference game is the target for which the message should be produced. The speaker then produces a probability distribution over vocabulary tokens of the message given the input $P(m | i_t, i_d)$, parametrized by the speaker model parameters $\theta_S$.
+The speaker receives as input tuples \texttt{(targets, distractors)}, where \texttt{targets} as well as \texttt{distractors} are features extracted from the ResNet50 for the sampled pairs, respectively. That is, the speaker knows which of the the two images in a given iteration of the reference game is the target for which the message should be produced. The speaker then produces a probability distribution over vocabulary tokens of the message given the input $P(m \mid i_t, i_d)$, parametrized by the speaker model parameters $\theta_S$. From a reinforcement learning perspective, training the speaker amounts to estimating the parametrized speaker policy $\pi_{\theta_s}(m \mid i_t, i_d)$.
 
-The speaker model consists of a linear layer which projects the 2048-dimensional image features to 512-dimensional embedding space. \pt{Not sure if the dimensionality is also different from what \textcite{lazaridou2020multi} do because of their details in the appendix. Depends on the final way to add visual embeddings to the LSTM and the word embedding dimensions.} The linear layer is first applied to the target images and then to the distractors, resulting in embeddings $i_t$ and $i_d$, respectively. The vectors are concatenated to $[i_t; i_d]$, the target embeddings always being the first ones, such that the speaker network implicitly knows which features represent the target. These 1024-dimensional vectors are used as input to the speaker's language module. The core of the module is the recurrent Long Short-Term Memory (LSTM) cell \parencite{hochreiter1997long}. More specifically, the language module consists of three layers: an embedding layer, mapping the vocabulary to 1024-dimensional word embeddings, a one-layer LSTM with 512-dimensional hidden and cell states; and a linear layer on top, mapping the last hidden state of the LSTM to a score over the vocabulary. The size of the vocabulary depends on the dataset (see above).
+The speaker model consists of a linear layer which projects the 2048-dimensional image features to 512-dimensional embedding space. The linear layer is first applied to both the target images and then to the distractors, resulting in embeddings $i_t$ and $i_d$, respectively. The vectors are concatenated to $[i_t; i_d]$, the target embeddings always being the first ones, such that the speaker network implicitly knows which features represent the target. These 1024-dimensional vectors are used as additional context in the speaker's language module. The core of the module is the recurrent Long Short-Term Memory (LSTM) cell \parencite{hochreiter1997long}. More specifically, the language module consists of three layers: an embedding layer, mapping the vocabulary to 512-dimensional word embeddings, a one-layer LSTM with 512-dimensional hidden and cell states; and a linear layer on top, mapping the last hidden state of the LSTM to a distribution over the vocabulary. The size of the vocabulary depends on the dataset (see above).
 
-During the reference game training, the speaker receives pairs of images, embeds them and passes the concatenated embedding as input to the LSTM. In order to sample the caption for the target, this embedding is prepended to the embedding of the \texttt{START} token. This two-token sequence is then passed to the LSTM and the linear output layer. The next token is sampled from a categorical distribution parametrized with the probabilities computed from the hidden state in the previous timestep, embedded and passed through the LSTM analogously, until the \texttt{END} token is sampled or the maximum caption length is achieved. The design wherein the image embedding is used as the initial token differs from the original design by \textcite{lazaridou2020multi} who prepend the image embedding to each word embedding at each generation time step. This decision had to be made because exploratory experiments showed that the original arcitecture doesn't work for the data at hand.\footnote{\pt{deatils if necessary.}} This is also a common practice in image captioning literature \pt{REF!}. Another possible approach that could be explored in future work would be to initialize the hidden states of the LSTM with the visual embeddings. In this case, the hidden and cell states of the LSTM were initialized with random values sampled from the standard normal distribution.The embedding and last linear layers' weights were initialized with random values sampled from the uniform distribution between -0.1 and 0.1, the biases were initialized with zeroes.  
-This architecure results in a total of 10,429,910 trainable parameters.  \pt{Make a graphic of the models and / or the reference game}.
+During the reference game training, the speaker receives pairs of images, embeds them and prepends the concatenated embedding to the special \texttt{START} token. This 1536-dimensional embedding is then passed through the LSTM and the linear output layer. The next token is sampled from a categorical distribution parametrized with the probabilities computed from the hidden state in the previous timestep. This procedure repeats until the \texttt{END} token is sampled or the maximum caption length is achieved. The \textit{baseline} experiments use the pure decoding strategy; additional experiments investigate the effects of using greedy decoding (see Chapter \ref{chapter02}). This architecture is also a common practice in image captioning literature (cf. \ref{chapter02}). Another possible approach that could be explored in future work would be to initialize the hidden states of the LSTM with the visual embeddings. In this case, the hidden and cell states of the LSTM were initialized with random values sampled from the standard normal distribution.The embedding and last linear layers' weights were initialized with random values sampled from the uniform distribution between -0.1 and 0.1, the biases were initialized with zeroes.  
+This architecure results in a total of \pt{10,429,910 check} trainable parameters.  \pt{Make a graphic of the models and / or the reference game}.
 
 \subsection{Listener}
 The listener receives as input the tuples \texttt{(images1, images2, messages)}, the first two inputs being ResNet50 features of the image pairs, input in random order, such that the agent doesn't know which image is the target. The \texttt{message} is the caption produced by the speaker. The listener then produces scores $P(i|m)$ over images identifying which one is the target, parametrized by the listener model parameters $\theta_L$.
 
 The message is passed to the language module which consists of an embedding layer, mapping the vocabulary to 512-dimensional word embeddings, and a one-layer LSTM with 512-dimensional hidden and cell states. All weights are initialized analagously to the respective weights of the speaker model. The hidden cell state $h_i$ at the last time step of embedding the received message is used as the final message representation. 
-The visual module of the listener consists of a linear layer which also projects the 2048-dimensional image features to a 512-dimensional embedding space. The images are passed through the linear layer one after the other, resulting in embeddings $i_1$ and $i_2$. \pt{Unsure about this step, although it follows some implementations of \textcite{lazaridou2016multi} of an analogous step.} Finally, the listener computes the dot products between each image embedding and the message embedding. The target is sampled from a categorical distribution parametrized with probabilities computed based on the dot products.  
-The architecture results in 1,049,088 trainable parameters for the listener's visual module and 4,176,896 trainable parameters for its LSTM.
+The visual module of the listener consists of a linear layer which also projects the 2048-dimensional image features to a 512-dimensional embedding space. The images are passed through the linear layer one after the other, resulting in embeddings $i_1$ and $i_2$. Finally, the listener computes the dot products between each image embedding and the message embedding. The target is sampled from a categorical distribution parametrized with probabilities computed based on the dot products.  
+The architecture results in \pt{check 1,049,088} trainable parameters for the listener's visual module and \pt{check 4,176,896} trainable parameters for its LSTM.
 
-The next section describes how these agents were trained in the reference game setting.
-
-\pt{Circle back to chapter 2 by talking about speaker and listener policies.}
+\pt{listener policies.}
 
 \subsection{General Training Details}
 
-All experiments were trained with a batch size of 64 pairs, using the Adam optimizer with a learning rate  of 0.001 \parencite{kingma2014adam}. In the reference game setting, the models were trained for two epochs per experiment. 
-The speaker parameters $\theta_S$ were updated by optimizing a compound loss function $J_s$. More precisely, the speaker loss consisted of a weighted sum of a functional loss $L_f$ and a structural loss $L_s$. The former was computed via the REINFORCE rule based on the listener's task performance (i.e., referential success). The speaker received the reward 1 if the listener guessed the target successfully, and -1 otherwise. The latter was computed via cross-entropy between the message produced by the speaker and the ground truth caption for the given target image. $L_f$ additionally included an entropy regularization term, weighted by 0.1 \pt{references}. The resulting loss is $J_s = L_f + 0.1 L_s$. 
-The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ optimized based on the guessed target classification of the images and the ground truth targets. 
+All experiments were trained with a batch size of 64 pairs, using the Adam optimizer with a learning rate  of 0.001 \parencite{kingma2014adam}. In the reference game setting, due to computational constraints, the models were trained for two epochs per experiment. \footnote{All experiments were conducted on a MacBook Pro with four Intel cores i7-1068NG7 with CPU @ 2.30GHz. On average, pretraining took 2h/epoch, reference games took 6h/epoch.} 
+
+In the reference games, the speaker parameters $\theta_S$ were updated by optimizing a compound loss function $J_s$. More precisely, the speaker loss consisted of a weighted sum of a functional loss $L_f$ and a structural loss $L_s$. The former was computed via the REINFORCE rule based on the listener's task performance (i.e., referential success). The speaker received the reward 1 if the listener guessed the target successfully, and -1 otherwise. The latter was computed via cross-entropy between the message produced by the speaker and the ground truth caption for the given target image. $L_f$ additionally included an entropy regularization term, weighted by 0.1. The resulting loss is $J_s = L_f + 0.1 L_s$. 
+The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ optimized based on the guessed target classification of the images and the ground truth targets using cross-entropy loss. 
+
 
 \section{Experiment Procedures and Results}
 
@@ -86,8 +100,6 @@ The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ opt
 Provide an overview of conducted experiments and establish their names for easier discussion downstream.
 
 \subsection{Speaker Pretraining}
-As described in Section \ref{model_pretraining}, there are different strategies for pretraining the speaker. Based on initial exploratory experiments reported in Appendex \ref{app:grid_search}, all speakers were pretrained using an exponentially decreasing teacher-forcing rate $0.5^{epoch-1}$, transitioning to auto-regressive training with pure decoding. That is, in the auto-regressive mode the model was fed its own predicted token from the previous timestep during training; that token was generated by pure sampling. Speakers for both datasets were pretrained in this set up. Figure \ref{fig:coco_pretraining} shows the pretraining dynamics of the MS COCO speaker, Figure \ref{fig:3dshapes_pretraining} shows the dynamics of the 3DShapes speaker.
-
 
 \begin{figure}
 	\centering
@@ -110,74 +122,167 @@ Table with image caption quality metrics of the pretrained speakers. Add same me
 		\hline
 		\textbf{Model name}                                    & \textbf{B-1} & \textbf{B-2} & \textbf{B-3} & \textbf{B-4} & \textbf{M} & \textbf{C} & \textbf{Val. loss} \\ \hline
 		Pretrained MS speaker                             & 0.408           & 0.137           & 0.042           & 0.013           & 0.116           & 0.165          & 4.079                    \\ \hline
-		MS Baseline experiment, random pairs, Ls = 0      &                 &                 &                 &                 &                 &                &                          \\ \hline
-		MS Baseline experiment, random pairs, Ls = 0.5    &                 &                 &                 &                 &                 &                &                          \\ \hline
-		MS Baseline experiment, random pairs, Ls = 0.75   & 0.407           & 0.133           & 0.037           & 0.010           & 0.116           & 0.178          & 4.056                    \\ \hline
-		MS Baseline experiment, similar pairs, Ls = 0.75  &                 &                 &                 &                 &                 &                &                          \\ \hline
+		MS Baseline, random, $L_s = 0$      &                 &                 &                 &                 &                 &                &                          \\ \hline
+		MS Baseline, random, $L_s = 0.5$   &                 &                 &                 &                 &                 &                &                          \\ \hline
+		MS Baseline, random, $L_s = 0.75$   & 0.407           & 0.133           & 0.037           & 0.010           & 0.116           & 0.178          & 4.056                    \\ \hline
+		MS Baseline, similar, $L_s = 0.75$  &                 &                 &                 &                 &                 &                &                          \\ \hline
 		Pretrained 3D speaker                            & 0.671           & 0.343           & 0.163           & 0.077           & 0.283           & 1.026          & 2.091                    \\ \hline
-		3D Baseline experiment, random pairs, Ls = 0     &                 &                 &                 &                 &                 &                &                          \\ \hline
-		3D Baseline experiment, random pairs, Ls = 0.5   &                 &                 &                 &                 &                 &                &                          \\ \hline
-		3D Baseline experiment, random pairs, Ls = 0.75  & 0.672           & 0.340           & 0.159           & 0.074           & 0.284           & 1.068          & 2.089                    \\ \hline
-		3D Baseline experiment, similar pairs, Ls = 0.75 & 0.673           & 0.335           & 0.152           & 0.070           & 0.279           & 1.033          & 2.103                    \\ \hline
+		3D Baseline, random, $L_s = 0$     &                 &                 &                 &                 &                 &                &                          \\ \hline
+		3D Baseline, random, $L_s = 0.5$   &                 &                 &                 &                 &                 &                &                          \\ \hline
+		3D Baseline, random, $L_s = 0.75$  & 0.672           & 0.340           & 0.159           & 0.074           & 0.284           & 1.068          & 2.089                    \\ \hline
+		3D Baseline, similar, $L_s = 0.75$ & 0.673           & 0.335           & 0.152           & 0.070           & 0.279           & 1.033          & 2.103                    \\ \hline
 		\pt{FILL ME with more expts} &                 &                 &                 &                 &                 &                &                          \\ \hline
 	\end{tabularx}
-\caption{\label{tab:eval_metrics_refgame} Caption evaluation metrics and the validation loss on a heldout dtaset, computed for the initial pretrained speakers and the speakers after training on the reference game. \textbf{B} denotes BLEU, \textbf{M} the METEOR score, \textbf{C} the CIDEr score, MS the MS COCO dataset and 3D the 3DShapes dataset.}
+\caption{\label{tab:eval_metrics_refgame} Caption evaluation metrics and the validation loss on a heldout dataset, computed for the initial pretrained speakers and the speakers after training on the reference game. \textbf{B} denotes BLEU, \textbf{M} the METEOR score, \textbf{C} the CIDEr score, MS the MS COCO dataset and 3D the 3DShapes dataset. ``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs.}
 \end{table}
 
-%\subsubsection{Training}
+The speaker agents were pretrained for both the MS COCO and 3Dshapes experiments. Conceptually, the model was pretrained in order to learn the statistical properties of English, i.e., ``learn to speak'', before being finetuned on the functional reference game task. This is can be motivated as providing general \textit{task-uncoditional} linguistic capabilities to the speaker which she can the transfer to specific tasks.
+
+Both speakers were pretrained in a supervised fashion by sampling pairs tuples of the form $(i_t, i_d, c_t)$ where $i_t, i_d$ are the target and distractor images, and $c_t$ in the target ground truth caption. The models were pretrained on 30,000 images selected at random from the respective dataset; for each image, the model saw five available ground truth captions. 
+The pretraining was accomplished with the cross-entropy loss. Both models were trained for ten epochs.
+
+As described in Section \ref{model_pretraining}, there are different strategies for pretraining the speaker. Based on initial exploratory experiments reported in Appendex \ref{app:grid_search}, all speakers were pretrained using an exponentially decreasing teacher-forcing rate $0.5^{epoch-1}$, transitioning to auto-regressive training with pure decoding. That is, in the auto-regressive mode the model was fed its own predicted token from the previous timestep during training; that token was generated by pure sampling. Speakers for both datasets were pretrained in this set up. Figure \ref{fig:coco_pretraining} shows the pretraining dynamics of the MS COCO speaker, Figure \ref{fig:3dshapes_pretraining} shows the dynamics of the 3DShapes speaker.
+
+The evaluation of their image captioning capabilities on standard metrics (introduced in Chapter \ref{chapter02}) after pretraining can be found in Table \ref{tab:eval_metrics_refgame}. The metrics were computed in a held out validation split with 5000 unique images and respective captions. Comparing the pretrained speakers to state-of-the-art image captioning model peformance in Table \ref{tab_coco_metrics_ref}, it is apparant that the speakers perform somewhat worse iin terms of standard caption evaluation metrics. It is hypothesized that this is due to the mixed teacher-forcing and auto-regression training mode. It is conjectured that the speaker quality only might affect the absolute performance and drift metric values, but the qualitative comparisons between experiments will remain unaffected because all experiments are based on the same pretrained speakers.
+
+Furthermore, all language drift metrics are computed for the pretrained models which arguably present a baseline for linguistic capabilities, before any deterioration might take place due to task optimization (see Table \ref{tab:drift_metrics_basic}).
+
 \subsection{MS COCO: Baseline Experiments}
+\label{expt:coco_baseline}
 
 \begin{table}[]
 	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
 		\hline
-		\textbf{Model name}                                    & \textbf{log P(m)} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Listener acc (random)} & \textbf{Listener acc (similar)} \\ \hline
-		Pretrained MS speaker               &       -131.760            &           -63.765             &          0.766            &           0.004           & 0.953 (random listeners)                 &                                           \\ \hline
-		MS Baseline, random pairs, Ls = 0      &                   &                        &                      &                      &                                          &                                           \\ \hline
-		MS Baseline, random pairs, Ls = 0.5    &                   &                        &                      &                      &                                          &                                           \\ \hline
-		MS Baseline, random pairs, Ls = 0.75   &       -136.998            &              -74.039          &        0.813              &        0.002              & 0.953                                    &                                           \\ \hline
-		MS Baseline, similar pairs, Ls = 0.75  &                   &                        &                      &                      &                                          &                                           \\ \hline
-		Pretrained 3D speaker                            &       -194.657            &         -138.227               &        5.781              &      0.029                & 0.953 (random listeners)                 & 0.881 (similar listeners)                 \\ \hline
-		3D Baseline, random pairs, Ls = 0     &                   &                        &                      &                      &                                          &                                           \\ \hline
-		3D Baseline, random pairs, Ls = 0.5   &                   &                        &                      &                      &                                          &                                           \\ \hline
-		3D Baseline, random pairs, Ls = 0.75  &       -198.858        &           -133.919           &          5.031            &         0.001             & 0.942                                    &                                           \\ \hline
-		3D Baseline, similar pairs, Ls = 0.75\footnote{The speaker is evaluated on random pairs here} &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &                                           \\ \hline
+		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Listener acc (random)} & \textbf{Listener acc (similar)} \\ \hline
+		Pretrained MS speaker               &      -131.598            &           -62.385             &          1.194            &           0.003           & 0.912 (random listeners)                 &                                           \\ \hline
+		MS Baseline, random, $L_s = 0$      &                   &                        &                      &                      &                                          &                                           \\ \hline
+		MS Baseline, random, $L_s = 0.5$    &                   &                        &                      &                      &                                          &                                           \\ \hline
+		MS Baseline, random, $L_s = 0.75$   &       -135.910            &             -71.819          &        1.197              &        0.000              & 0.953                                    &                                           \\ \hline
+		MS Baseline, similar, $L_s = 0.75$  &                   &                        &                      &                      &                                          &                                           \\ \hline
+		Pretrained 3D speaker                            &       -195.753            &         -145.638               &        5.428              &      0.001                & 0.953 (random listeners)                 & 0.881 (similar listeners, random pairs)                 \\ \hline
+		3D Baseline, random, $L_s = 0$     &                   &                        &                      &                      &                                          &                                           \\ \hline
+		3D Baseline, random, $L_s = 0.5$   &                   &                        &                      &                      &                                          &                                           \\ \hline
+		3D Baseline, random, $L_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
+		3D Baseline, similar, $L_s = 0.75$\footnote{The speaker is evaluated on random pairs here} &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
 		&                   &                        &                      &                      &                                          &                                           \\ \hline
 	\end{tabularx}
 \caption{\label{tab:drift_metrics_basic} Language drift metrics and listener test accuracies on different pairs. 
-	``Baseline'' refers to the setup wherein the listener is trained jointly with thte speaker, using pure decoding. MS refers to the MS COCO dataset, 3D ro the 3DShapes one. }
+	``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding. MS refers to the MS COCO dataset, 3D ro the 3DShapes one. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. ``Overlap (d)'' refers to the discrete overlap metric, ``overlap (c)'' to continuous overlap.}
 \end{table}
 
-For evaluation here: compute test listener accuracy (at least on random pairs), plot loss and accuracy dynamics during training, plot drift metrics gathered during training. Have a table with test metric values.
+The baseline experiment on MS COCO was conducted on 30,000 images which were not used during pretraining. The target-distractor pairs were constructed at random, and each target appeared in five pairs such that the structural loss could be minimized with respect to all five available ground truth captions. Pure decoding was used for decoding the speaker's message, and the weight of the structural loss was $L_s = 0.75$. The weight of the functional loss was $L_f = 0.25$, respecitvely. These configurations are treated as the baseline experiment since preliminary explorations revealed that these are the minimal requirements for a successful reference game (see Appendix \ref{app:grid_search} for details). The training dynamics can be seen in Figure \ref{fig:coco_baseline_075_speaker_loss} (overall speaker loss) and Figure \ref{fig:coco_baseline_075_listener_acc} (listener accuracy).
 
-This subsection describes the procedure and the results of experiments conducted on random target-distractor pairs. Results of varying the structural loss weight are also discussed here.
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/coco_baseline_random_075_speaker_loss.png}
+	\caption{Total speaker train loss in the baseline MS COCO experiment (pure decoding, $L_s = 0.75$). \pt{The style of the plot will be adjusted to the previous ones.}}
+	\label{fig:coco_baseline_075_speaker_loss}
+\end{figure}
 
-The listener test accuracies are computed on 1000 pairs of images which weren't part of wither pretraining or the reference game training.
-Due to a coding mistake, the language drift and validation loss computed during training of the baseline random pairs experiment on 3dshapes were computed on 50 images from the training dataset, not the validation dataset. 
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/coco_baseline_random_075_listener_acc.png}
+	\caption{Listener train accuracy in the baseline MS COCO experiment (pure decoding, $L_s = 0.75$) \pt{The style of the plot will be fixed}}
+	\label{fig:coco_baseline_075_listener_acc}
+\end{figure}
 
-Results of the evaluation of the speaker quality in terms of validation loss and imgae caption metrics discussed in Chapter \ref{chapter02} are presented in Table \ref{tab:eval_metrics_refgame}.
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/coco_baseline_random_075_structural_drift.png}
+	\caption{Structural drift computed every 200 training steps on 320 held out images in the baseline MS COCO experiment (pure decoding, $L_s = 0.75$) \pt{The style of the plot will be fixed. The weird spikes of the ground truth drift are because the plot contains a point for each of the three validation steps. Will be averaged in the final plot}} 
+	\label{fig:coco_baseline_075_str_drift}
+\end{figure}
 
-Results in terms of listener accuracy and language drift are presented in Table \ref{tab:drift_metrics_basic}.
+For computing the task accuracy, listener accuracy was computed on a held out validation set of 1000 pairs of images which weren't part of wither pretraining or the reference game training. The test accuracy of 0.953 in Table \ref{tab:drift_metrics_basic} shows that the agents successfully learned to play the reference game. Furthermore, as expected, the language underwent slight deterioration, both syntactically and semantically, compared to the pretrained speaker. The dynamics of structural drift can be seen in Figure \ref{fig:coco_baseline_075_str_drift}.\footnote{Due to a coding mistake, no analogous plot for semantic drift could be created.} Due to the small size of the decrease, no trend can be observed visually.
+Interestingly, a slight increase in the discrete overlap metric can be observed, indicating that the speaker learned to produce messages that are more appropriate ifor the target compared to the distractor, and, therefore, might be more discriminative. On the other hand, the similarity of embeddings of the ground truth caption and the message decreased relative to the distractor similarity, compared to the pretrained speaker. This might be due to the difficulty to propagate the learning signal all the way to the embedding layer.
 
-For evaluating the random pairs vs the similar pairs, it would be good to conduct tests with similar and random pairs for both agents, and the especially look at discrete overlaps on the similar pairs, and check if the agents learned to distinguish the images more graunlarly. If not, discuss this as an interesting result, wherein it is actually easier for humans if the discriminative feature is clear as opposed to more distinct images (check if it cognitively plausible though). Find a way to check the granularity of produced descriptions / categories (maybe via simple POS tagging / partial parsing somehow).
+\pt{Linear regressions will be computed on the drift values collected during the training.}
+
+Additionally, the fine-tuned speaker was also evaluated with standard image captioning metrics. Table \ref{tab:eval_metrics_refgame} shows that caption quality marginally decreased with respect to almost all metrics, confirming the trend shown by the structural and semantic language drift metrics.
+
 \subsection{MS COCO: Similar Pairs Experiments}
-\pt{TBD}
+
+% For evaluating the random pairs vs the similar pairs, it would be good to conduct tests with similar and random pairs for both agents, and the especially look at discrete overlaps on the similar pairs, and check if the agents learned to distinguish the images more graunlarly. If not, discuss this as an interesting result, wherein it is actually easier for humans if the discriminative feature is clear as opposed to more distinct images (check if it cognitively plausible though). Find a way to check the granularity of produced descriptions / categories (maybe via simple POS tagging / partial parsing somehow).
+
 
 \subsection{MS COCO: Fixed Listener Experiments}
 
 \subsection{3Dshapes: Baseline Experiments}
+\label{expt:3dshapes_baseline}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_baseline_random_075_speaker_loss.png}
+	\caption{Total speaker train loss in the baseline 3Dshapes experiment (pure decoding, $L_s = 0.75$). \pt{The style of the plot will be adjusted to the previous ones.}}
+	\label{fig:3dshapes_baseline_075_speaker_loss}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_baseline_random_075_listener_acc.png}
+	\caption{Listener train accuracy in the baseline 3Dshapes experiment (pure decoding, $L_s = 0.75$) \pt{The style of the plot will be fixed}}
+	\label{fig:3dshapes_baseline_075_listener_acc}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_baseline_random_075_str_drift.png}
+	\caption{Structural drift computed every 200 training steps on 50 images in the baseline 3Dshapes experiment (pure decoding, $L_s = 0.75$) \pt{The style of the plot will be fixed. The weird spikes of the ground truth drift are because the plot contains a point for each of the three validation steps. Will be averaged in the final plot}} 
+	\label{fig:3dshapes_baseline_075_str_drift}
+\end{figure}
+
+The configurations as well as the training procedure of this experiment match the configurations of the MS COCO baseline experiment in Section \ref{expt:coco_baseline}. The training dynamics can be seen in Figure \ref{fig:3dshapes_baseline_075_speaker_loss} (total speaker loss) and Figure \ref{fig:3dshapes_baseline_075_listener_acc}. Compared to the reference game on MS COCO, the training of the agents converges faster. This is likely due to the significantly smaller action space (i.e., vocabulary space---49 tokens for 3Dshapes vs. 4052 tokens for MS COCO) that the speaker has to explore. Conversely, it might be the case that the MS COCO baseline agents achieve better results if trained longer.
+ 
+Supporting the visual results, Table \ref{tab:drift_metrics_basic} shows that the agents successfully learned the reference game---the listener test accuracy is 0.979, even outperforming the MS COCO baseline experiment.  
+The dynamics of structural drift can be seen in Figure \ref{fig:3dshapes_baseline_075_str_drift}.\footnote{Due to a coding mistake, the language drift and validation loss computed during training of the baseline random pairs experiment on 3Dshapes were computed on 50 images from the training dataset, not the validation dataset.} 
+In this experiment, only a slight semantic drift can be seen in Table \ref{tab:drift_metrics_basic}. The structural changes are negligible. The continuous overlap metric decreased, compared to the pretrained speaker. Interestingly, the magnitude of the structural drift values is much higher for 3Dshapes, indicating that the created captions might in general be less likely under the pretrained Transformer XL model used for the computation. Similarly, the higher magnitude of the semantic drift values indicates that the speaker is generally uncertain when generating captions for these images. This could partly be due to the difference in the 3Dshapes data distribution compared to the ImageNet data in which the visual module of the speaker was pretrained.
+
+\pt{Linear regressions will be computed on the drift values collected during the training.}
+
+Additionally, the fine-tuned speaker was also evaluated with standard image captioning metrics. Table \ref{tab:eval_metrics_refgame} shows that caption quality marginally decreased with respect to almost all metrics except for CIDEr and BLEU-1. Noteworthily, in contrast to the language drift metrics, these metrics are significantly higher for the 3Dshapes dataset compared to MS COCO, indicating that the generated captions have a relatively high overlap with ground truth captions. 
+
+\pt{Effects of varying Ls will also be described here.}
 
 \subsection{3DShapes: Similar Pairs Experiments}
+\label{expt:3dsapes_similar}
 
-In this experiment, the target-distractor pairs consisted of similar images. \pt{add particular operationalization} One of the hypotheses addressed in this experiment is whether the agents are able to flexibly adapt the specificity of their messages, compared to the random pairs baseline experiment \pt{H number}. This was approximately investigated via the distribution of part-of-speech tags in a test set of 1000 pairs for which messages were generated. The distributions are compared when the 1000 pairs are random versus similar. The results for 1000 random pairs are shown in Figure  \ref{fig:3dshapes_pos}. Based on visual inspection, it can be seen that the distribution of the token categories, especially the modifier tokens like color or size adjectives did not shift significantly. 
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_baseline_similar_075_speaker_loss.png}
+	\caption{Total speaker train loss in the baseline 3Dshapes experiment (pure decoding, $L_s = 0.75$). \pt{The style of the plot will be adjusted to the previous ones.}}
+	\label{fig:3dshapes_similar_075_speaker_loss}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_baseline_similar_075_listener_acc.png}
+	\caption{Listener train accuracy in the baseline 3Dshapes experiment (pure decoding, $L_s = 0.75$) \pt{The style of the plot will be fixed}}
+	\label{fig:3dshapes_similar_075_listener_acc}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_baseline_similar_075_str_drift.png}
+	\caption{Structural drift computed every 200 training steps on 50 images in the baseline 3Dshapes experiment (pure decoding, $L_s = 0.75$) \pt{The style of the plot will be fixed. The weird spikes of the ground truth drift are because the plot contains a point for each of the three validation steps. Will be averaged in the final plot}} 
+	\label{fig:3dshapes_similar_075_str_drift}
+\end{figure}
+
+In this experiment, the target-distractor pairs consisted of similar images. Otherwise, the procedure and configurations are the same as in the baseline experiment in Section \ref{expt:3dshapes_baseline}. 
+Figure \ref{fig:3dshapes_similar_075_speaker_loss} indicates that it is much harder for the speaker to produce discriminative messages when the target-distractor pairs are similar, compared to random pairs. That is, there are less options for producing good messages, such that the functional reward signal is much weaker than in the former experiment, resulting in almost absent speaker adaptation. Similarly, the listener is much slower to learn the reference game and the grounding of the speaker's messages to the images (Figure \ref{fig:3dshapes_similar_075_listener_acc}). These dynamics confirm that the agents are sensitive to their visual input, and that the task success is closely dependent on the perceptual difficulty to discriminate the target and distractors.
+
+The hypothesis addressed in this experiment is whether the agents were able to flexibly adapt the specificity of their messages, compared to the random pairs baseline experiment (\textbf{H5}). This was approximately investigated via the distribution of part-of-speech tags in a test set of 1000 target-distractor pairs for which messages were generated. The distributions were compared when the 1000 pairs are random versus similar. The results are shown in Figure \ref{fig:3dshapes_pos}. Based on visual inspection, it can be seen that the distribution of the token categories, especially the modifier tokens like color or size adjectives, did not shift significantly. This suggests that the artificial speaker agent is not as flexible in adapting her messages to differences in the input as human speakers (cf. Chapter \ref{chapter03}). However, it is evident from Figure \ref{fig:3dshapes_similar_075_listener_acc} that the agents did not converge after two epochs, so longer training might provide a different picture. 
 
 \begin{figure}
 	\centering
 	\includegraphics[width=\linewidth]{images/3dshapes_random_vs_similar_POS_counts.png}
-	\caption{POS counts for random 1000 test image pairs. }
+	\caption{Left: POS counts in captions produced by a speaker trained on random pairs (blue) and a speaker trained on similar pairs(orange) for 1000 random test image pairs. Right: POS counts in captions produced by a speaker trained on random pairs (blue) and a speaker trained on similar pairs(orange) for 100 similar test image pairs. \pt{The difference in the number of pairs will be fixed}}
 	\label{fig:3dshapes_pos}
 \end{figure}
 
+In this experiment, structural drift compared to both the pretrained speaker and the baseline experiment can be observed (see Table \ref{tab:drift_metrics_basic}), which is corroborated by a slight visually apparent trend in Figure \ref{fig:3dshapes_similar_075_str_drift}. However, a little increase in the discrete overlap compared to the pretrained speaker indicates that the speaker improved on the task of producing more discriminative messages.
+
 \subsection{3Dshapes: Fixed Listener Experiments}
+Failed! Details. 
 
 \subsection{3DShapes: Short Captions Experiment}
 
