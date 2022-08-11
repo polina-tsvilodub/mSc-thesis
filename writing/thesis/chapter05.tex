@@ -259,23 +259,26 @@ To sum up, given the presented training configurations, \textbf{H4} is not suppo
 
 \subsection{3Dshapes: Baseline Experiments}
 \label{expt:3dshapes_baseline}
-\pt{explain what a negative cont overlap means}
+
+The goal of these experiments is to investigate the importance of presenting exhaustive example captions to the model during training for potentially mitigating structural drift. Additionally, these experiments focus on investigating the model's potential to generate informative captions, without being overinformative. \pt{spell out the operationalization}
+
 \begin{table}[]
 	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
 		\hline
 		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Listener acc (random)} & \textbf{Listener acc (similar)} \\ \hline
-		Ground truth validation captions       &      -164.752            &         -101.329               &       6.881             &      0.023               &                 &                \\ \hline
+		Ground truth exhaustive validation captions       &      -164.752            &         -101.329               &       6.881             &      0.023               &                 &                \\ \hline
+		Ground truth short validation captions       &     -98.999            &    -162.836              &      4.968         &      0.022           &                 &                \\ \hline
 		Pretrained 3D speaker                            &       -195.753            &         -145.638               &        5.428              &      0.001                & 0.953 (random listeners)                 & 0.808 (similar listeners)                 \\ \hline
 		3D Baseline, random, $\lambda_s = 0$ &       -195.420            &    -147.938                    &           5.294            &      -0.002                &                 0.979                         &                                           \\ \hline
 		3D Baseline, random, $\lambda_s = 0.25$     &     -196.811              &       -140.862                 &          5.104            &       -0.006               &          0.969                                &                                           \\ \hline
 		3D Baseline, random, $\lambda_s = 0.5$   &         -196.722          &        -144.301                &        4.968              &          0.002            &                  0.971                      &                                           \\ \hline
 		3D Baseline, random, $\lambda_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
 		3D Baseline, random, $\lambda_s = 1$   &      -196.019             &            -137.456             &        5.257              &          -0.005            &              0.979                            &                                           \\ \hline
-		3D Baseline, similar, $\lambda_s = 0.75$\footnote{The speaker is evaluated on random pairs here} &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
-		&                   &                        &                      &                      &                                          &                                           \\ \hline
+		3D Baseline, similar, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
+		3D Short, similar, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
 	\end{tabularx}
 	\caption{\label{tab:3dshapes_drift_metrics_basic} Language drift metrics and listener test accuracies on different pairs. 
-		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding. MS refers to the MS COCO dataset, 3D ro the 3DShapes one. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. ``Overlap (d)'' refers to the discrete overlap metric, ``overlap (c)'' to continuous overlap.}
+		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding. MS refers to the MS COCO dataset, 3D ro the 3DShapes one. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. ``Overlap (d)'' refers to the discrete overlap metric, ``overlap (c)'' to continuous overlap. The speakers trained on similar pairs are still tested on random pairs.}
 \end{table}
 
 \begin{figure}
@@ -327,12 +330,17 @@ Additionally, the fine-tuned speaker was also evaluated with standard image capt
 
 In order to adress \textbf{H4} with the 3Dshapes dataset, a line of experiments identical to MS COCO based ones were conducted. Specifically, the structural loss weight $\lambda_s$ was also varied. The pattern of results visible in Figure~\ref{fig:3dshapes_baseline_speaker_loss_listener_acc_all} is very similar to MS COCO. The magnitude of the speaker loss is what is mostly influenced by the $\lambda_s$ weight; the listener's training accuracy is not affected by the variation. This is confirmed by the consistently high listener test accuracy, outperforming the pretrained speaker (Table~\ref{tab:3dshapes_drift_metrics_basic}, fifth column). Differently to MS COCO, the speaker trained with $\lambda_s = 1$ outperformed the pretrained speaker by 0.026, indicating that there might have been room for further pretraining of the speaker. \pt{be careful to not confuse task performance with pretraining; also check this in coco.}
 
-As for MS COCO, validation language drift metrics were computed on a held out validation set of 1000 images. Table \ref{tab:3dshapes_drift_metrics_basic} indicates that, similarly to MS COCO, no clear trends can be observed with respect to all four drift metrics. Negative continuous overlap values (Tab.~\ref{tab:3dshapes_drift_metrics_basic}, fourth column) indicate that the emebddings of generated captions were partly more similar to the distractor ground truth embeddings, than to target ground truth embeddings. These findings are generally corroborated by the dynamics of structural and semantic drifts computed during training (see Fig.~\ref{fig:3dshapes_baseline_all_str_sem_drift}). In contrast to MS COCO, semantic drift of the captions produced by the speakers is stronger than of the ground truth captions. 
+As for MS COCO, validation language drift metrics were computed on a held out validation set of 1000 images. Table \ref{tab:3dshapes_drift_metrics_basic} indicates that, similarly to MS COCO, no clear trends can be observed with respect to all four drift metrics. Negative continuous overlap values (Tab.~\ref{tab:3dshapes_drift_metrics_basic}, fourth column) indicate that the emebddings of generated captions were partly more similar to the distractor ground truth embeddings, than to target ground truth embeddings. These findings are generally corroborated by the dynamics of structural and semantic drifts computed during training (see Fig.~\ref{fig:3dshapes_baseline_all_str_sem_drift}). In contrast to MS COCO, semantic drift of the captions produced by the speakers is stronger than of the ground truth captions, i.e., the conditional log likelihood of the generated captions is lower. 
 
-Image captioning evaluation results. 
+These speakers were also evaluated on the image captioning metrics. \pt{TODO Table \ref{tab:eval_metrics_refgame} indicates that the captions for all $\lambda_s$ configurations are closer to ground truth captions compared to MS COCO results.}
+
+These experiments in comparison to analogous experiments on MS COCO (Section \ref{expt:coco_baseline}) also allowed to adress \textbf{H9} as they provide different degrees of freedom for the model to exploit structural deterioration as a method for producing `more discrminative' captions. In line with \textbf{H9}, the largest difference in structural drift compared to the pretrained speaker in 3Dshapes experiments on random image pairs is 1.058 (Tab.~\ref{tab:3dshapes_drift_metrics_basic}), compared to 5.164 (Tab.~\ref{tab:coco_drift_metrics_basic}). 
+
+To sum up, similarly to MS COCO, the precise parametrization of the loss did not consistently influence task performance or language drift, given the model and the dataset.
 
 \subsection{3Dshapes: Similar Pairs Experiments}
 \label{expt:3dsapes_similar}
+
 \textbf{H5}
 
 \begin{figure}
@@ -350,8 +358,8 @@ Image captioning evaluation results.
 	\label{fig:3dshapes_similar_075_str_sem_drift}
 \end{figure}
 
-In this experiment, the target-distractor pairs consisted of similar images. Otherwise, the procedure and configurations are the same as in the baseline experiment in Section \ref{expt:3dshapes_baseline}. 
-Figure \ref{fig:3dshapes_similar_075_speaker_loss_listener_acc} (left) indicates that it is much harder for the speaker to produce discriminative messages when the target-distractor pairs are similar, compared to random pairs. That is, there are less options for producing good messages, such that the functional reward signal is much weaker than in the former experiment, resulting in almost absent speaker adaptation. Similarly, the listener is much slower to learn the reference game and the grounding of the speaker's messages to the images (Figure \ref{fig:3dshapes_similar_075_speaker_loss_listener_acc}, right). These dynamics confirm that the agents are sensitive to their visual input, and that the task success is closely dependent on the perceptual difficulty to discriminate the target and distractors.
+In this experiment, the target-distractor pairs consisted of similar images. That is, at least three of the six features matched in the target and distractor image. Otherwise, the procedure and configurations are the same as in the baseline experiment in Section \ref{expt:3dshapes_baseline}. 
+Figure \ref{fig:3dshapes_similar_075_speaker_loss_listener_acc} (left) indicates that it is much harder for the speaker to produce discriminative messages when the target-distractor pairs are similar, compared to random pairs (Fig.~\ref{fig:3dshapes_baseline_075_speaker_loss_listener_acc}). That is, there are less options for producing good messages, such that the functional reward signal is much weaker than in the former experiment, resulting in almost absent speaker adaptation. Similarly, the listener is much slower to learn the reference game and the grounding of the speaker's messages to the images (Figure \ref{fig:3dshapes_similar_075_speaker_loss_listener_acc}, right). These dynamics confirm that the agents are sensitive to their visual input, and that the task success is closely dependent on the perceptual difficulty to discriminate the target and distractors.
 
 The hypothesis addressed in this experiment is whether the agents were able to flexibly adapt the specificity of their messages, compared to the random pairs baseline experiment (\textbf{H5}). This was approximately investigated via the distribution of part-of-speech tags in a test set of 1000 target-distractor pairs for which messages were generated. The distributions were compared when the 1000 pairs are random versus similar. The results are shown in Figure \ref{fig:3dshapes_pos}. Based on visual inspection, it can be seen that the distribution of the token categories, especially the modifier tokens like color or size adjectives, did not shift significantly. This suggests that the artificial speaker agent is not as flexible in adapting her messages to differences in the input as human speakers (cf. Chapter \ref{chapter03}). However, it is evident from Figure \ref{fig:3dshapes_similar_075_speaker_loss_listener_acc} that the agents did not converge after two epochs, so longer training might provide a different picture. \pt{TODO: compare this with findings by \cite{lazaridou2016multi} and \cite{lee2019countering}.}
 
@@ -369,7 +377,27 @@ In this experiment, structural drift compared to both the pretrained speaker and
 \pt{This experiment did not result in successful reference games under the architecture suggestion originally by MF. That is, when the listener picked the referent based on the likelihood of the generated message given the target vs distractor under the pretrained speaker, the reference game didn't work. I take from it that 1) the speaker might be not good enough and is too uncertain about its own captions and 2) the learning signal might be too weak. If it okay, I will try to use a different fixed listener architecture like e.g. in \cite{lazaridou2020multi}.} \textbf{H6}
 
 \subsection{3DShapes: Short Captions Experiment}
+
+Confirming intuitions, the listener's performance suggests to be a little bit better when learning from exhaustive captions, compared to short captions only. This is due to the higher perceptual pressure to generate more detailed descriptions in order to refer to the target, compared to random image pairs. 
 \textbf{H10}
+Baseline, similar pairs.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/shapes_short_vs_exh_refgame_49_pure_075_similar.png}
+	\caption{Training dynamics on similar image pairs given a dataset with exhaustive captions vs. short captions only.}
+	\label{fig:3dshapes_short_v_exh_similar_losses}
+\end{figure}
+
+Given the strong effect of length, it does not come surprising that the structural drift of exhaustive captions is higher than of short ones. However, the semantic drift is much more severe for short captions, compared to exhaustive ones, therefore, at least partly supporting \textbf{H10}. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_short_vs_exh_structural_semantic_drift_49_pure_075_similar.png}
+	\caption{Language drift metrics computed during training gieven model trained on similar image pairs given a dataset with exhaustive captions vs. short captions only. The drifts were computed on random image pairs for comparability.}
+	\label{fig:3dshapes_short_v_exh_similar_str_sem}
+\end{figure}
+
 
 \section{Language Drift Hypotheses: Discussion}
 \pt{\textbf{H9} will be discussed here (compute differences bw tuned and pretrained agent.)}
