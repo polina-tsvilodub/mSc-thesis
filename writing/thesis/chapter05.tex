@@ -115,7 +115,7 @@ The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ opt
 This section provides an overview of conducted experiments and discusses their procedures as well as results.
 
 \subsection{Speaker Pretraining}
-
+\label{speaker_pretraining}
 \begin{figure}
 	\centering
 	\includegraphics[width=\linewidth]{images/coco_pretraining_losses_ppls.png}
@@ -305,6 +305,7 @@ The goal of these experiments is to investigate the importance of presenting exh
 		3D Baseline, random, $\lambda_s = 1$   &      -196.019             &            -137.456             &        5.257              &          -0.005            &              0.979                            &                                           \\ \hline
 		3D Baseline, similar, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
 		3D Short, similar, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
+		3D fixed listener, random, $\lambda_s = 0$&      -196.111          &     -136.134                  &             5.339         &         -0.008            &                   0.927                      &                                           \\ \hline
 		3D fixed listener, random, $\lambda_s = 0.75$&      -194.990          &     -140.483                  &             5.298         &         -0.003            &                   0.927                      &                                           \\ \hline
 	\end{tabularx}
 	\caption{\label{tab:3dshapes_drift_metrics_basic} Language drift metrics and listener test accuracies on different pairs. 
@@ -406,31 +407,71 @@ In this experiment, structural drift compared to both the pretrained speaker and
 
 Similarly to MS COCO in Section \ref{exp:coco_fixed_listener}, \textbf{H6} was also investigated for the 3Dshapes dataset in an analogous set up. The fixed listener was pretrained on exhaustive captions, and showed a post-pretraining test accuracy of 0.998 on ground truth test captions and 0.920 with the retrained speaker messages. 
 
-The results on 3Dshapes patterned with those on MS COCO both in terms of training dynamics (Fig.~\ref{fig:3dshapes_fixed_listener_075_speaker_losses_listener_acc}) and the listener test accuracy being lower than for the joint listener experiment and the pretrained speaker (Tab.~\ref{tab:3dshapes_drift_metrics_basic}). The lower accuracy compared to the pretrained speaker could be attributed to the fact that the listener was pretrained on ground truth captions and then tested with speaker generated captions which are somewhat different from the ground truth due to the auto-regressive pretraining (see Appendix \ref{app:grid_search}), while the pretrained speaker was tested with the jointly trained listener from the baseline experiment.
+The results on 3Dshapes patterned with those on MS COCO both in terms of training dynamics (Fig.~\ref{fig:3dshapes_fixed_listener_0_075_speaker_losses_listener_acc}) and the listener test accuracy being lower than for the joint listener experiment and the pretrained speaker (Tab.~\ref{tab:3dshapes_drift_metrics_basic}). The lower accuracy compared to the pretrained speaker could be attributed to the fact that the listener was pretrained on ground truth captions and then tested with speaker generated captions which are somewhat different from the ground truth due to the auto-regressive pretraining (see Appendix \ref{app:grid_search}), while the pretrained speaker was tested with the jointly trained listener from the baseline experiment.
 \begin{figure}
 	\centering
-	\includegraphics[width=\linewidth]{images/3dshapes_fixedListener_baseline_random_075_losses.png}
-	\caption{Drift dynamics computed during reference game training with the fixed listener on 3Dshapes (pure decoding, $\lambda_s=0.75$). Higher values indicate less drift. Left: Structural drift of ground truth and predicted captions under the pretrained Transformer XL model. Right: Semantic drift of ground truth and predicted captions under the pretrained speaker model.}
-	\label{fig:3dshapes_fixed_listener_075_speaker_losses_listener_acc}
+	\includegraphics[width=\linewidth]{images/3dshapes_fixedListener_baseline_random_0_075_losses.png}
+	\caption{Training results of reference games against a fixed listener on exhaustive captions of 3Dshapes (pure decoding, $\lambda_s=0$ vs. $\lambda_s=0.75$). Left: Total speaker training loss. Right: Listener training accuracy.}
+	\label{fig:3dshapes_fixed_listener_0_075_speaker_losses_listener_acc}
 \end{figure}
 
-Similarly to MS COCO, training the speaker against a fixed listener also mitigated both structural and semantic drift (Tab.~\ref{tab:3dshapes_drift_metrics_basic}). In fact, the drift decreased even compared to the pretrained speaker. This suggests that in a smaller action space of the 3Dshapes experiment, the functional training signal from the listener pretrained on ground truth captions might be strong enough to further fine-tune the speaker towards more ground truth-like messages. The intuition that this signal seems to rather pressure the speaker towards ground truth like captions than towards functional improvement is supported by an absense of increases in the overlap metrics, compared to the pretrained speaker (Tab. \ref{tab:3dshapes_drift_metrics_basic}). 
+Similarly to MS COCO, training the speaker against a fixed listener also mitigated both structural and semantic drift (Tab.~\ref{tab:3dshapes_drift_metrics_basic}). In fact, the drift decreased even compared to the pretrained speaker. This suggests that in a smaller action space of the 3Dshapes experiment, the functional training signal from the listener pretrained on ground truth captions might be strong enough to further fine-tune the speaker towards more ground truth-like messages. The intuition that this signal seems to rather pressure the speaker towards ground truth like captions than towards strong functional improvement is supported by an absense of definitve increases in the overlap metrics, compared to the pretrained speaker (Tab. \ref{tab:3dshapes_drift_metrics_basic}). 
 \pt{TODO image caption evaluation}
 \begin{figure}
 	\centering
-	\includegraphics[width=\linewidth]{images/3dshapes_fixedListener_exh_structural_semantic_drift_49_pure_075_random.png}
-	\caption{Drift dynamics computed during reference game training with the fixed listener on 3Dshapes (pure decoding, $\lambda_s=0.75$). Higher values indicate less drift. Left: Structural drift of ground truth and predicted captions under the pretrained Transformer XL model. Right: Semantic drift of ground truth and predicted captions under the pretrained speaker model.}
-	\label{fig:3dshapes_fixed_listener_075_str_sem_drift}
+	\includegraphics[width=\linewidth]{images/3dshapes_fixedListener_structural_semantic_drift_49_pure_0_075_random.png}
+	\caption{Drift dynamics computed during reference game training with the fixed listener on 3Dshapes (pure decoding, $\lambda_s=0$ vs. $\lambda_s=0.75$). Higher values indicate less drift. Left: Structural drift of ground truth and predicted captions under the pretrained Transformer XL model. Right: Semantic drift of ground truth and predicted captions under the pretrained speaker model.}
+	\label{fig:3dshapes_fixed_listener_0_075_str_sem_drift}
 \end{figure}
+
+In order to investigate whether it is indeed the functional task signal that is responsible for mitigating the language drift, a follow-up experiment with a functional loss only (i.e., $\lambda_s=0$) was also conducted for 3Dshapes. While the task success was not visibly improved (see Fig.~\ref{fig:3dshapes_fixed_listener_0_075_speaker_losses_listener_acc}, right, orange vs. blue line), structural and semantic drifts during training were indeed slightly lower for $\lambda_s=0$, compared to $\lambda_s=0.75$ (Fig.~\ref{3dshapes_fixed_listener_0_075_str_sem_drift}, green line being slightly above the red one). Validation results in Table \ref{tab:3dshapes_drift_metrics_basic} indicate that semantic drift was better mitigated under a stronger functional training signal ($\lambda_s =0$ compared to $\lambda_s =0.75$), suggesting that the grounding was better preserved. Structural drift, however, increased, compared to $\lambda_s =0.75$, which is expected given that there was no structural learning signal anymore in the $\lambda_s =0$ experiment. Further confirming intuitions regarding the role of the functional learning signal, the discrete overlap increased in the $\lambda_s =0$ configuration, outperforming the baseline joint listener experiment. The continuous overlap, on the other hand, decreased, compared to both pretrained and baseline joint speakers, indicating that the functional improvements might not be translated to topographic effects in the embedding space. \pt{cheeeeeck this attempt to be fancy. or at least circle to topographic mesaures by e g \cite{lazaridou2020emergent}} 
 
 To sum up, \textbf{H6} is also supported by the data in the 3Dshapes experiment. Similarly to MS COCO, one can infer that reference game performance is at least partly carried by speaker-listener co-adaptation, and that the functional signal available from the pretrained listener might rather have structural effects in this smaller action space, than lead to functional improvement. \pt{double check}  
 
 \subsection{3DShapes: Short Captions Experiment}
 
-Confirming intuitions, the listener's performance suggests to be a little bit better when learning from exhaustive captions, compared to short captions only. This is due to the higher perceptual pressure to generate more detailed descriptions in order to refer to the target, compared to random image pairs. 
-\textbf{H10}
-Baseline, similar pairs.
+The goal of this experiment is to address \textbf{H10} by conducting experiments wherein the speaker may produce captions of varying granularity.
+To this end, the second speaker pretrained on mixed-length captions was used (see Section \ref{speaker_pretraining}). During reference game training, the structural loss was also computed against ground truth captions of varying length. That is, the targets that the speaker had to refer to during training were associated with both exhaustive and short ground truth captions. Otherwise, the training procedure was identical to previous experiments.
 
+These experiments addressed several aspects. First, they addressed the question whether the presense of exhaustive captions (as was the case in the baseline experiment) was necessary for successful task completion. Second, they addressed whether absense of exhaustivity might be the reason for language drift because the speaker might have to resort to drift strategies in order to complete the functional task due to a lack of linguistic task-appropriate resources. \pt{unnecessarily complex. get tot he point.}
+Third, speaker flexibility to generate messages of variable length in absense of explicit message length regularization was investigated. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_wShort_baseline_random_075_losses.png}
+	\caption{Training results of the baseline reference game on both short and exhaustive captions of 3Dshapes (pure decoding, $\lambda_s=0.75$). Left: Total speaker training loss. Right: Listener training accuracy.}
+	\label{fig:3dshapes_wShort_075_speaker_losses_listener_acc}
+\end{figure}
+
+The training results of the baseline experiment with short captions can be seen in Figure~\ref{3dshapes_wShort_075_speaker_losses_listener_acc}. Based on visual comparison to the exhaustive captions baseline experiment (Fig.~\ref{fig:3dshapes_baseline_075_speaker_loss_listener_acc}), no qualitative differences in either speaker convergence or listener training performance can be observed. 
+This could be because in this experiment the target and distractor images were paired at random and were, therefore, likely quite dissimilar, intuitively rendering the presence of exhaustive messages not necessary for successful reference.
+\pt{Add validation results to table}
+
+Turning towards language drift, one can observe that both structural and semantic drift during training is lower for this experiment compared to the exhaustive experiment (Fig.~\ref{fig:3dshapes_wShort_075_str_sem_drift} vs. Fig.~\ref{fig:3dshapes_baseline_075_str_drift}). The lower structural drift could be attributed to generally higher naturalness of the short captions compared to the exhaustive ones, thus, rendering them more likely under a pretrained language model. The lower semantic drift which additionally is lower for the generated captions than for the ground truth ones might indicate that the speaker was further fine-tuned to produce messages that are more similar to the ground truth. This might be easier than for exhaustive captions because of the shorter message length which is advantageous for RNN training \parencite[cf.][]{jaeger2002tutorial}.
+
+Explain testing procedure: on the test set, it was also chosen at random whether a target image was associated with three short or exhasutive ground truth captions out of five. 
+\pt{recompute the drift measures of the ground truth short captions---should be done on the mixed dataset, not the short only.}
+%Confirming intuitions, the listener's performance suggests to be a little bit better when learning from exhaustive captions, compared to short captions only. This is due to the higher perceptual pressure to generate more detailed descriptions in order to refer to the target, compared to random image pairs. 
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_wShort_structural_semantic_drift_49_pure_075_random.png}
+	\caption{Drift dynamics computed during reference game training on both short and exhaustive captions of 3Dshapes (pure decoding, $\lambda_s=0.75$). Higher values indicate less drift. Left: Structural drift of ground truth and predicted captions under the pretrained Transformer XL model. Right: Semantic drift of ground truth and predicted captions under the pretrained speaker model.}
+	\label{fig:3dshapes_wShort_075_str_sem_drift}
+\end{figure}
+
+\pt{!!! Normalization of the drift measures by average length in order to make exhaustive and short caps comparable!!!}
+
+In order to investigate the third aspect, lengths of the captions generated by the speaker on the validation set were computed. These were calculated by counting the number of tokens until the first occurrence of either the END or the PAD special token in the message (excluding them). \pt{sure about the PAD token? i am saying something different in the hypotheses section---make homogenous.}
+
+\subsubsection{Similar Pairs Experiment}
+
+In order to increase the pressure towards necessity of exhaustive descriptions, an experiment including short captions was conducted on \emph{similar} target-distractor image pairs.
+
+\textbf{H10} and a little bit \textbf{H5}.
+Baseline, similar pairs.
+\pt{has to be redone with the new pretrianed speaker}
 \begin{figure}
 	\centering
 	\includegraphics[width=\linewidth]{images/shapes_short_vs_exh_refgame_49_pure_075_similar.png}
