@@ -16,3 +16,5 @@ Potential other future investigation: using pretrained embeddings.
 Also different pretrianing strategies, potentially start with auto-regression and then transition to teacher forcing. 
 
 Overall, we see how important the combination of particular hyperparameters and training configurations are, indicating that future research should focus on architectures which might be more stable against the alternations. 
+
+Conditioning of the sepaker: during pretraining it already saw both images (necessary for architectural reasons), but we cannot know if it did not result in an implicit spill over and discriminativity already during pretraining. also this makes the model task specific (pairs of images only). 
