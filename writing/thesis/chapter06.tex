@@ -18,3 +18,8 @@ Also different pretrianing strategies, potentially start with auto-regression an
 Overall, we see how important the combination of particular hyperparameters and training configurations are, indicating that future research should focus on architectures which might be more stable against the alternations. 
 
 Conditioning of the sepaker: during pretraining it already saw both images (necessary for architectural reasons), but we cannot know if it did not result in an implicit spill over and discriminativity already during pretraining. also this makes the model task specific (pairs of images only). 
+
+An interesting direction for future research is also testing the present system against other datasets, e.g., for testing referential expressions like the dataset constructed by \cite{mao2016generation}. An interesting question there would be to quantify inhowfar discriminativity in a reference game aligns with good referential expressions; if it does, this dataset could provide a good benchmark for evaluating the functional success of the speaker. In order to connect to their work, one would need to to formalize the step of inferring a suitable target region or bounding box for the reference game (i.e., identify a discriminative referent), and then generate the discriminative expression. 
+
+Beam search in decoding.
+\pt{maybe structure discussion according to: summary, experimental methods, conceptual aspects, relation to extant work and future directions, conclusion.}
