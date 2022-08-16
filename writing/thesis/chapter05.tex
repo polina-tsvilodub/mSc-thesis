@@ -477,17 +477,19 @@ To sum up, \textbf{H6} is also supported by the data in the 3Dshapes experiment.
 		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Listener acc (random)} & \textbf{Listener acc (similar)} \\ \hline
 		Ground truth mixed       &     -139.026            &    -80.323             &       7.401        &        0.028        &                 &                \\ \hline
 		Pretrained 3D mixed speaker    &      -192.903           &         -59.623               &        2.309              &      -0.001                & 0.944 (baseline listeners)                 &                 \\ \hline
-		3D Baseline, random, $\lambda_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
-		3D Baseline, similar, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
-		3D Baseline, similar fixed, same test, $\lambda_s = 0.75$ &       -193.709            &    -141.010                  &        3.280            &      -0.003         &            0.688       &                              \\ \hline
-		3D Baseline, similar fixed, diff. test, $\lambda_s = 0.75$ &      -193.524             &          -144.813            &       3.230             &     -0.005          &     0.711              &                              \\ \hline
-		3D Short, random, $\lambda_s = 0.75$&      -189.285             &      -58.278                  &             2.316        &         0.000             &                   0.957                       &                                           \\ \hline
-		3D Short, similar, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
-		3D Short, similar fixed, same test $\lambda_s = 0.75$&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726                       &                                           \\ \hline
-		3D Short, similar fixed, diff. test $\lambda_s = 0.75$&     -191.051        &        -59.088           &   1.947        &        0.002          &        0.717                               &                                           \\ \hline
+		3D Baseline, random  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
+		%3D Baseline, similar all, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
+		3D Baseline, similar fixed, random test &       -193.709            &    -141.010                  &        3.280            &      -0.003         &            0.688       &                           \\ \hline
+		3D Baseline, similar fixed, same test &      -199.014        &        -146.280           &        2.875       &      0.029   &              &          0.691                   \\ \hline
+		3D Baseline, similar fixed, diff. test &       -197.539        &       -146.362           &   2.705          & 0.030    &                &              0.561     / 0.705           \\ \hline
+		3D Short, random&      -189.285             &      -58.278                  &             2.316        &         0.000             &                   0.957                       &                                           \\ \hline
+		%3D Short, similar all, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
+		3D Short, similar fixed, random test&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726                       &                                        \\ \hline
+		3D Short, similar fixed, same test&            &           &         &       &                       &               0.699                            \\ \hline
+		3D Short, similar fixed, diff. test &  -189.320       & -58.463     & 1.663        &  0.003         &      &     0.562 / 0.751         \\ \hline
 	\end{tabularx}
-	\caption{\label{tab:3dshapes_drift_metrics_basic_short} Language drift metrics and listener test accuracies on different pairs. 
-		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding. MS refers to the MS COCO dataset, 3D ro the 3DShapes one. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. ``Overlap (d)'' refers to the discrete overlap metric, ``overlap (c)'' to continuous overlap. The speakers trained on similar pairs are still tested on random pairs.}
+	\caption{\label{tab:3dshapes_drift_metrics_basic_short} Language drift metrics and listener test accuracies of similar pairs experiments on the 3Dshapes dataset. 
+		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding, using exhaustive captions only. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. $\lambda_s = 0.75$ is used in all experiments.}
 \end{table}
 
 The goal of this experiment is to address \textbf{H10} by conducting experiments wherein the speaker produced captions of varying granularity.
@@ -575,3 +577,5 @@ Baseline, similar pairs.
 Fixed listener results consistent with \cite{lazaridou2020multi}.
 
 Note that I did not use the term ``functional'' drift once. Add that in overlap metric discussions.
+
+Reasons / effects behind drift: pretraining mode of agents in combination with reference game training signal; strength of functional signal (to a small extent); action space / vocabulary size. 
