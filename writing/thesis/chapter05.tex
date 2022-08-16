@@ -485,7 +485,7 @@ To sum up, \textbf{H6} is also supported by the data in the 3Dshapes experiment.
 		3D Short, random&      -189.285             &      -58.278                  &             2.316        &         0.000             &                   0.957                       &                                           \\ \hline
 		%3D Short, similar all, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
 		3D Short, similar fixed, random test&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726                       &                                        \\ \hline
-		3D Short, similar fixed, same test&            &           &         &       &                       &               0.699                            \\ \hline
+		3D Short, similar fixed, same test&      -192.130      &     -58.753      &   0.837      & 0.003      &                       &               0.723                           \\ \hline
 		3D Short, similar fixed, diff. test &  -189.320       & -58.463     & 1.663        &  0.003         &      &     0.562 / 0.751         \\ \hline
 	\end{tabularx}
 	\caption{\label{tab:3dshapes_drift_metrics_basic_short} Language drift metrics and listener test accuracies of similar pairs experiments on the 3Dshapes dataset. 
@@ -579,3 +579,5 @@ Fixed listener results consistent with \cite{lazaridou2020multi}.
 Note that I did not use the term ``functional'' drift once. Add that in overlap metric discussions.
 
 Reasons / effects behind drift: pretraining mode of agents in combination with reference game training signal; strength of functional signal (to a small extent); action space / vocabulary size. 
+
+If there is no difference between exhaustive and short captions on 3D, it is actually promising - it means that it is not necessary to really have completely exhaustive (almost task-specific) annotations - it is sufficient that the agents saw possible descriptions of all features during pretraining, even when the sentences were short. This means, we can indeed achieve something with RL and interactive learning from experience, it is not all about supervised learning for a given task.
