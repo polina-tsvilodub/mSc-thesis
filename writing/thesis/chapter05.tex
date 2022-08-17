@@ -112,7 +112,7 @@ The listener parameters $\theta_L$ were updated via cross-entropy loss $J_l$ opt
 
 %\pt{when discussing results and esp PPL, \cite{havrylov2017emergence} also compute encoder PPLs}
 
-This section provides an overview of conducted experiments and discusses their procedures as well as results.
+This section provides an overview of conducted experiments and discusses their procedures as well as results. \pt{note that the tests were done using pure decoding also, not greedy as is often used at inference time for rnns.}
 
 \subsection{Speaker Pretraining}
 \label{speaker_pretraining}
@@ -494,7 +494,7 @@ To sum up, \textbf{H6} is also supported by the data in the 3Dshapes experiment.
 		%3D Short, similar all, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
 		3D Short, similar fixed, random test&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726                       &                                        \\ \hline
 		3D Short, similar fixed, same test&      -192.130      &     -58.753      &   0.837      & 0.003      &                       &               0.723                           \\ \hline
-		3D Short, similar fixed, diff. test &  -189.320       & -58.463     & 1.663        &  0.003         &      &     0.562 / 0.751         \\ \hline
+		3D Short, similar fixed, diff. test &  -187.713       & -57.257     & 1.915        &  0.002         &      &     0.564       \\ \hline
 	\end{tabularx}
 	\caption{\label{tab:3dshapes_drift_metrics_basic_short} Language drift metrics and listener test accuracies of similar pairs experiments on the 3Dshapes dataset. 
 		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding, using exhaustive captions only. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. $\lambda_s = 0.75$ is used in all experiments.}
@@ -563,6 +563,12 @@ In order to increase the pressure towards necessity of exhaustive descriptions, 
 \textbf{H10} and a little bit \textbf{H5}.
 Baseline, similar pairs.
 
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/3dshapes_exh_short_similar_sameTest_diffTest_length_counts.png}
+	\caption{Generated caption lengths for the mixed captions (left) and exhaustive (right) speakers trained in the similar pairs experiment on 3Dshapes. The test images were either similar along the same features as the training image pairs, or along the other three features.}
+	\label{fig:3dshapes_exh_short_same_diff_lengths}
+\end{figure}
 
 %\begin{figure}
 %	\centering
