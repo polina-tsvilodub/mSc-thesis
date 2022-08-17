@@ -252,12 +252,8 @@ To sum up, given the presented training configurations, \textbf{H4} is not suppo
 	\label{fig:coco_baseline_str_sem_drift_all}
 \end{figure}
 
-
-\pt{After trying again with the old speaker and the grid search 15 000 images, it is cear that the variation of Ls had an effect on the teacher-forced speaker only, not on the auto-regressive one. Therefore, actually do a rather detailed Appendix and discuss this from a cognitive plausibility perspective in terms of the actual pretraining mode, and also in terms of importance of this hyperparameter of the experiment which is usually not discussed in the literature. But also check grid search files on Omniboard. Padding was also a difference bw final and grid search experiments.}
-
 \subsection{MS COCO: Similar Pairs Experiments}
-
-\textbf{H5}
+In order to increase the similarity of target and distractor images and thereby increase the pressure to produce more specific messages in reference to the target \parencite[cf.][]{graf2016animal}, an experiment with similar image pairs was conducted on MS COCO. It also allowed to address \textbf{H5}. As described in Section \ref{ds:coco}, the pairs were constructed by picking the ones depicting at least the same three basic-level categories, as provided by the dataset annotations. Therefore, arguably the similariy of the images was conceptual, which also implied a certain degree of perceptual similarity. \pt{double check is this might be borne out in my image similarity data}. 
 % For evaluating the random pairs vs the similar pairs, it would be good to conduct tests with similar and random pairs for both agents, and the especially look at discrete overlaps on the similar pairs, and check if the agents learned to distinguish the images more graunlarly. If not, discuss this as an interesting result, wherein it is actually easier for humans if the discriminative feature is clear as opposed to more distinct images (check if it cognitively plausible though). Find a way to check the granularity of produced descriptions / categories (maybe via simple POS tagging / partial parsing somehow).
 \begin{figure}[h]
 	\centering
