@@ -72,9 +72,9 @@ The model consisted of multiple transformer layers combining image and word embe
 
 The experiments in this thesis closely follow the archtecture by \cite{vinyals2015show}. However, introduction of multimodal representation based models and more advanced networks as agents in multi-agent communication settings relying on visual input is an interesting direction for future work. 
 
-\subsection{Model Pretraining}
+\subsection{Model Training}
 \label{model_pretraining}
-In this section, different approaches for training recurrent models are discussed. Recurrent models are used for predicting sequences, like the image captioning model is predicting a caption given the image. In the context of multi-agent reference game experiments discussed in this thesis, this step of training an image captioning model can be seen as speaker agent pretraining.
+In this section, different approaches for training recurrent models are discussed. Recurrent models are used for predicting sequences, like the image captioning model is predicting a caption given the image. In the context of multi-agent reference game experiments discussed in this thesis, this step of training an image captioning model can be seen as \emph{speaker agent pretraining}.
 
 It is assumed that the target task for the model is predicting the next token of a sequence, given the preceding tokens; this task is at the core of various applications like neural machine translation, image caption generation, text sumamrization and others \parencite[e.~g.,][]{cho2014learning, sutskever2014sequence}. Such tasks are usually modeled with recurrent neural networks \parencite{rumelhart1986learning}. The challenge when training recurrent neural network models which are predicting sequences at inference time by replicating this mode during train time, i.e., by conditioning the next token on the output of the model itself from the previous timestep during training, is slow convergence of the training, its instability and potentially poor generation skills \parencite{lamb2016professor}. The main training approach that has been proposed in order to mitigate these issues is \textit{teacher forcing} training, with several extensions to it, like \textit{search over candidate output sequences}, \textit{curriculum learning} and \textit{professor forcing} \parencite{goodfellow2016deep, williams1989algorithm}.
 
