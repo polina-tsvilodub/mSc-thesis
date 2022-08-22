@@ -20,9 +20,8 @@ The next two sections describe in detail the properties of the datasets and how 
 \subsection{MS COCO}
 \label{ds:coco}
 The MS COCO Captions dataset \parencite{chen2015microsoft} contains images and respective annotations from the 2014 split of the MS COCO dataset \parencite{lin2014microsoft}. Figure \ref{fig:coco_example} presents an example image and annotations form the dataset. The dataset contains 82,783 images in the training split, each associated with around five human-annoated caption, resulting in a total of 414,113 unique image-caption pairs. The validation split contains 40,504 images, annotated with a total of 202,654 human-produced captions. The respective dataset splits and annotations were downloaded from \url{https://cocodataset.org/#download}.
-Furthermore, each image is annotated with bounding boxes of objects and category labels for the depicted objects. There are 80 different basic-level annotation categories, listed in the Appendix \ref{appendix}. These 80 categories are grouped into 12 superordinate categories: person, accessory, indoor, appliance, food, kitchen, sports, furniture, outdoor, animal, electronic and vehicle.
+Furthermore, each image is annotated with bounding boxes of objects and category labels for the depicted objects. There are 80 different basic-level annotation categories, listed in the Appendix \ref{appendix}. These 80 categories are grouped into 12 superordinate categories (see Tab.~\ref{tab:app_coco_categories}).
 On average, 2.9 basic-level categories and 2.3 superordinate categories occur per image.
-\pt{There will be a table with super-basic category mappings and counts of at least each super category}.
 
 The natural language captions associated with the images contain a total of 24,697 unique tokens. Yet over 99\% of the words occuring in the entire dataset are covered by 6000 most frequent tokens. 
 The final size of the vocabulary $V$ used in the experiments is 4054, including four special tokens \texttt{START, END, UNK, PAD}, as it comprises over 98\% of the token distribution mass, while comprising 16.4\% of unique tokens occurring in all captions. This vocabulary size was chosen as a good trade-off between a sufficient variety of words that the speaker can choose to describe the images and an action space size which is still learnabale in the current set-up. 
@@ -338,7 +337,14 @@ To sum up, the data supports \textbf{H6} for the MS COCO experiment, but also st
 \caption{\label{tab:coco_greedy}Lanaguage drift metrics and listener test accuracies (``Acc.'') on MS COCO experiments conducted with greedy decoding.}
 \end{table}
 
-\pt{Overall summary of MS COCO experiments goes here.} Overall, the reference games on MS COCO 
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/coco_greedy_all_075_losses.png}
+	\caption{Training results of three experiment with greedy decoding on MS COCO ($\lambda_s = 0.75$): baseline random pairs, with a fixed listener on random pairs, and with a joint listener on similar pairs. Left: Total speaker training loss. Right: Listener training accuracy.}
+	\label{fig:coco_greedy_baseline}
+\end{figure} 
+
+\pt{Overall summary of MS COCO experiments goes here.}
 
 \subsection{3Dshapes: Baseline Experiments}
 \label{expt:3dshapes_baseline}
@@ -421,7 +427,7 @@ To sum up, similarly to MS COCO, the precise parametrization of the loss did not
 \subsection{3Dshapes: Similar Pairs Experiments}
 \label{expt:3dsapes_similar}
 
-\begin{table}[h]
+\begin{table}[]
 	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
 		\hline
 		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. (random)} & \textbf{Acc. (similar)} \\ \hline
@@ -533,7 +539,7 @@ To sum up, \textbf{H6} is also supported by the results of the 3Dshapes experime
 		%3D Baseline, similar fixed, same test &      -199.014        &        -146.280           &        2.875       &      0.029   &              &          0.691                   \\ \hline
 		%3D Baseline, similar fixed, diff. test &     -194.510     &    -146.557          &   2.071      & 0.020    &                &              0.570          \\ \hline
 		3D Short, random&      -189.285             &      -58.278                  &             2.316        &         0.000             &                   0.957                       &                                           \\ \hline
-		3D Short, similar all, $\lambda_s = 0.75$&             &              &          &           &                   &                                           \\ \hline
+		3D Short, similar all, $\lambda_s = 0.75$&     -194.183        &   -59.371           &    1.032       &   0.000        &                   &         0.791       \\ \hline
 		3D Short, similar fixed, random test&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726                       &                                        \\ \hline
 		3D Short, similar fixed, same test&      -192.130      &     -58.753      &   0.837      & 0.003      &                       &               0.723                           \\ \hline
 		3D Short, similar fixed, diff. test &  -187.713       & -57.257     & 1.915        &  0.002         &      &     0.564       \\ \hline
@@ -670,6 +676,6 @@ In conclusion, the experiments have revealed how strong the effect of the speake
 %Note that I did not use the term ``functional'' drift once. Add that in overlap metric discussions.
 %If there is no difference between exhaustive and short captions on 3D, it is actually promising - it means that it is not necessary to really have completely exhaustive (almost task-specific) annotations - it is sufficient that the agents saw possible descriptions of all features during pretraining, even when the sentences were short. This means, we can indeed achieve something with RL and interactive learning from experience, it is not all about supervised learning for a given task.
 
-This seeming insensitivity of the overlap metrics might be due to several reasons. First, due to a lack of comparability to other work, further experiments, e. g., replicating existing work, involving these mterics need to be conducted in order to properly assess their plausibility. Second, the continuous overlap might be subject to vanishing gradients which become too small over the backpropagation steps through time of the message sequence in order to affect the embedding layer \parencite[cf.][]{jaeger2002tutorial}. Finally, it might be the case that generally the training just did not proceed for a sufficient number of epochs for the functional loss to take effect, as literature has argued that REINFORCE based training, especially given large action spaces like the one at hand, is slower to converge \parencite{havrylov2017emergence} \pt{look into Havrylov again: is convergence always in terms of listener performance, or speaker loss too?}.
+%This seeming insensitivity of the overlap metrics might be due to several reasons. First, due to a lack of comparability to other work, further experiments, e. g., replicating existing work, involving these mterics need to be conducted in order to properly assess their plausibility. Second, the continuous overlap might be subject to vanishing gradients which become too small over the backpropagation steps through time of the message sequence in order to affect the embedding layer \parencite[cf.][]{jaeger2002tutorial}. Finally, it might be the case that generally the training just did not proceed for a sufficient number of epochs for the functional loss to take effect, as literature has argued that REINFORCE based training, especially given large action spaces like the one at hand, is slower to converge \parencite{havrylov2017emergence} \pt{look into Havrylov again: is convergence always in terms of listener performance, or speaker loss too?}.
 
-Discuss POS analyses in relation to \cite{lee2019countering}.
+%Discuss POS analyses in relation to \cite{lee2019countering}.
