@@ -343,7 +343,13 @@ To sum up, the data supports \textbf{H6} for the MS COCO experiment, but also st
 	\caption{Training results of three experiment with greedy decoding on MS COCO ($\lambda_s = 0.75$): baseline random pairs, with a fixed listener on random pairs, and with a joint listener on similar pairs. Left: Total speaker training loss. Right: Listener training accuracy.}
 	\label{fig:coco_greedy_baseline}
 \end{figure} 
-
+5
+\begin{figure}
+	\centering
+	\includegraphics[width=\linewidth]{images/coco_structural_semantic_drift_greedy_all_4000_pure_075.png}
+	\caption{Drift computed every 200 training steps on 50 images in MS COCO experimens, using greedy speaker decoding (pure decoding, $\lambda_s = 0.75$). Left: Strucutral drift of ground truth and predicted captions under a pretrained LM. Right: Semantic drift of ground truth and predicted captions under the pretrained speaker model.}
+	\label{fig:coco_greedy_drifts}
+\end{figure} 
 \pt{Overall summary of MS COCO experiments goes here.}
 
 \subsection{3Dshapes: Baseline Experiments}
