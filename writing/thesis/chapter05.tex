@@ -378,6 +378,7 @@ These trends also overpowered differences in the visual input, yielding similar 
 Overall, this combination of low drifts with a failure to learn the reference game indicates that the drift values alone are not representative of the agents' success, and factors which are not captured by the metrics may play a critical role for functional success, especially when training the listener agent from scratch. The results also suggest that the decoding strategy is a critical component of the system which may need to be held constant between pretraining and task-based fine-tuning, which may imply limitations when using pretrained models for fine-tuning on downstream tasks.
 
 \pt{Overall summary of MS COCO experiments goes here.}
+Summarizing the experiments on the MS COCO dataset, it was shown that artificial agents could learn to play a reference game on real-world images, while using natural language. Their learning speed in the game crucially depended on the discriminability of the target among distractors. Consistent with the literature, the agents were subject to structural and semantic language drift which was best mitigated by training the speaker against a fixed listener, but, at the same time, was pre-determined by the quality of the pretrained speaker. The decoding strategy was shown to be an important factor for the drift. Finally, it was shown that task-conditional fine-tuning of the speaker's messages might require longer training, although even a few epochs were sufficient for the speaker to adjust the granularity of her messages according to the complexity of the image pairs.
 
 \subsection{3Dshapes: Baseline Experiments}
 \label{expt:3dshapes_baseline}
@@ -694,6 +695,9 @@ In sum, this is a promising result showing that it may not be necessary to have 
 %	\label{fig:3dshapes_short_v_exh_similar_str_sem}
 %\end{figure}
 \pt{summary of 3Dshapes experiments goes here}
+Summarizing the experiments on the 3Dshapes dataset, it was shown that the agents could successfully learn the reference game on this synthetic dataset. Crucially, thir success depended on the similarity of the image pairs. 
+The agents were also subject to structural and semantic drift phenomena, although some dynamics differed from the observations in the literature and in the MS COCO experiments, revealing the importance of the nature of visual input, the captions and the action space size (i.e., the vocabulary size) for language drift. It was shown that the capacity of the speaker to be fine-tuned on the task might be dependent on fine-grained differences in the visual input and resulting task-based learning signal \pt{double check strength here}. 
+It was shown that the presence of exhaustive annotations was not necessary in order to mitigate language drift, although it might help the speaker to learn to describe most discriminative attributes of the target in complex contexts. On the contrary, dataset statistics like the length of the captions might play a larger role with respect to language drift than the exhaustive content of the annotations.
 
 \section{Language Drift Hypotheses: Discussion}
 
