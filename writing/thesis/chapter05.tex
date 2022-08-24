@@ -96,7 +96,7 @@ The architecture results in 1,049,088 trainable parameters for the listener's vi
 
 
 \subsection{General Training Details}
-
+\label{general_train_details}
 All experiments were trained with a batch size of 64 pairs, using the Adam optimizer with a learning rate  of 0.001 \parencite{kingma2014adam}. In the reference game setting, due to computational constraints, the models were trained for two epochs per experiment. \footnote{Pretraining and some experiments were conducted on a MacBook Pro with four Intel cores i7-1068NG7 with CPU @ 2.30GHz. On average, pretraining took 2h/epoch, reference games took 6h/epoch. Remaining experiments were conducted using Google Colab and their Tesla P100 GPU with 16GB memory. There, training took on average 3h/epoch.} 
 
 In the reference games, following \cite{lazaridou2020multi}, the speaker parameters $\theta_S$ were updated by optimizing a compound loss function $J_s$. More precisely, the speaker loss consisted of a weighted sum of a functional loss $L_f$ and a structural loss $L_s$. The former was computed via the REINFORCE rule based on the listener's task performance (i.e., referential success). The speaker received the reward 1 if the listener guessed the target successfully, and -1 otherwise. The structural loss was a supervised training loss, computed via cross-entropy between the message produced by the speaker and the ground truth caption for the given target image. $L_f$ additionally included an entropy regularization term, weighted by 0.1. The resulting loss was:
