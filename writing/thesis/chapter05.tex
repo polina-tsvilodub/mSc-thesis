@@ -124,7 +124,7 @@ First, a general pipeline of the main reference games as it applies to all exper
 	\item Training image pairs are created from a set of 30,000 images and all five captions for each image unseen during pretraining, resulting in (approximately) 150,000 training pairs, batched into batches of 64 pairs. This results in 2343 training steps per epoch. The pairs are constructed either at random (while making sure the two images are not the same) or by choosing similar target-distractor pairs. 
 	\item During each step, the agents play one reference game round: the speaker sees a target in context of a distractor and generates a messages about the target which is received by the listener. The listener sees the same images and picks the target based on the speaker's message. The speaker is updated according to both the structural well-formedness of her message compared to the ground truth caption of the target and the listener's success; the listener is updated according to her task success. 
 	\item Each 200 steps of training, the structural and semantic drift metrics are computed on three held out batches (192 images) in order to observe their dynamics.
-	\item After training, the agents are evaluated on a held out test set of 1,000 images which were neither part of pretraining nor of reference game training. During the evaluation, the agents are put in evaluation mode and the listener accuracy and all the drift metrics are computed. Depending on the evaluation, the 1,000 images are grouped into random or similar pairs. Generally, the drift values of the ground truth captions of the test sets and of the respective pretrained speaker captions on the test sets are treated as benchmarks for comparing drift dynamics.
+	\item After training, the agents are evaluated on a held out test set of 1,000 images which were neither part of pretraining nor reference game training. During the evaluation, the agents are put in evaluation mode and the listener accuracy and all the drift metrics are computed. If the agents were trained on random image pairs, the 1,000 images are grouped into random pairs, if on similar image pairs---into similar pairs, respectively. These are the pairs the reported test accuracies are computed on. Generally, the drift values of the ground truth captions of the test sets and of the respective pretrained speaker captions on the test sets are treated as benchmarks for comparing drift dynamics.
 \end{enumerate}
 Specific configurations of each experiment are described in the respective sections. 
 
@@ -192,20 +192,20 @@ Equipped with the pretrained speaker agents, the reference game experiments are 
 \label{expt:coco_baseline}
 
 \begin{table}[]
-	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
+	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|}
 		\hline
-		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. (random)} & \textbf{Acc. (similar)} \\ \hline
-		Ground truth val.               &     -108.566            &          -80.399             &    9.147           &       0.038          &            &                           \\ \hline
-		Ground truth similar val.               &     -110.074        &       -79.991           &             &           &            &                           \\ \hline
-		Pretrained MS speaker               &      -131.598            &           -62.385             &          1.194            &           0.003           & 0.912 (random listeners)                 &                                           \\ \hline
-		MS Baseline, random, $\lambda_s = 0$      &     -131.890              &         -63.319               &        1.259       &         0.003             &             0.924                             &                                           \\ \hline
-		MS Baseline, random, $\lambda_s = 0.25$    &      -133.954             &          -65.533              &          1.173            &       0.004               &           0.935                               &                                           \\ \hline
-		MS Baseline, random, $\lambda_s = 0.5$      &         -133.595         &           -67.904             &        1.106              &        0.001              &             0.890                             &                                           \\ \hline
-		MS Baseline, random, $\lambda_s = 0.75$   &       -135.910            &             -71.819          &        1.197              &        0.000              & 0.953                                    &                                           \\ \hline
-		MS Baseline, random, $\lambda_s =1$  &      -136.762             &          -70.454              &         1.125             &          0.001            &                   0.914                       &                                           \\ \hline
-		MS Baseline, similar, $\lambda_s = 0.75$  &     -133.093              &       -66.955                &               0.155       &       -0.001               &      0.687             &                               0.648            \\ \hline
-		MS, random, fixed listener, $\lambda_s = 0$  &         -130.624         &           -62.095             &     1.201                 &        0.003              &                          0.888                &                                           \\ \hline
-		MS, random, fixed listener, $\lambda_s = 0.75$  &         -134.408          &           -67.627             &     1.042                 &        0.003              &                          0.881                &                                           \\ \hline
+		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. } \\ \hline
+		Ground truth val.               &     -108.566            &          -80.399             &    9.147           &       0.038          &  0.963 (fixed listener)                  \\ \hline
+		Ground truth similar val.               &     -110.074        &       -79.991           &             &           &      ---         \\ \hline
+		Pretrained MS speaker               &      -131.598            &           -62.385             &          1.194            &           0.003           & 0.902 (fixed listeners)                 \\ \hline
+		MS Baseline, random, $\lambda_s = 0$      &     -131.890              &         -63.319               &        1.259       &         0.003             &             0.924                        \\ \hline
+		MS Baseline, random, $\lambda_s = 0.25$    &      -133.954             &          -65.533              &          1.173            &       0.004               &           0.935               \\ \hline
+		MS Baseline, random, $\lambda_s = 0.5$      &         -133.595         &           -67.904             &        1.106              &        0.001              &             0.890                 \\ \hline
+		MS Baseline, random, $\lambda_s = 0.75$   &       -135.910            &             -71.819          &        1.197              &        0.000              & 0.953                \\ \hline
+		MS Baseline, random, $\lambda_s =1$  &      -136.762             &          -70.454              &         1.125             &          0.001            &                   0.914         \\ \hline
+		MS Baseline, similar, $\lambda_s = 0.75$  &     -133.093              &       -66.955                &               0.155       &       -0.001               &        0.648            \\ \hline
+		MS, random, fixed listener, $\lambda_s = 0$  &         -130.624         &           -62.095             &     1.201                 &        0.003              &                          0.888               \\ \hline
+		MS, random, fixed listener, $\lambda_s = 0.75$  &         -134.408          &           -67.627             &     1.042                 &        0.003              &                          0.881     \\ \hline
 	\end{tabularx}
 \caption{\label{tab:coco_drift_metrics_basic} Language drift metrics and listener test accuracies (``Acc'') on different image pairs. 
 	``Baseline'' refers to joint speaker and listener training using pure decoding. MS refers to the MS COCO dataset. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar pairs. ``Overlap (d)'' refers to the discrete overlap metric, ``overlap (c)'' to continuous overlap.}
@@ -338,15 +338,15 @@ To sum up, the data supports \textbf{H6} for the MS COCO experiment, but also st
 \subsection{MS COCO: Greedy Decoding Experiments}
 \label{expt:coco_greedy}
 \begin{table}[]
-	\begin{tabularx}{\linewidth}{|X|l|l|X|X|X|X|}
+	\begin{tabularx}{\linewidth}{|X|l|l|X|X|X|}
 		\hline
-			\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. (random)} & \textbf{Acc. (similar)} \\ \hline
-			 Baseline random pairs, fixed listener, pure decoding   &     -138.500         &         -74.988               &       1.059            &      0.001               &       0.865          &                \\ \hline
-			 Baseline random pairs, fixed listener, greedy decoding   &     -100.674     &         -36.419              &       1.400       &      0.005             &       0.814          &                \\ \hline
-			 Baseline random pairs, pure decoding   & -136.114        &      -72.959            &       1.065          &      0.002               &       0.55          &                \\ \hline
-			 Baseline random pairs, greedy decoding   &-100.187      &    -35.910            &       1.355          &      0.006            &       0.544         &                \\ \hline
-			 Baseline similar pairs, pure decoding   &     -137.491& -77.898    & 0.198    &   -0.005    &            &  0.542        \\ \hline
-			 Baseline similar pairs, greedy decoding   &   -101.436  &      -38.911        &     0.044   &     0.003     &            &     0.565           \\ \hline
+			\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. }  \\ \hline
+			 Baseline random pairs, fixed listener, pure decoding   &     -138.500         &         -74.988               &       1.059            &      0.001               &       0.865       \\ \hline
+			 Baseline random pairs, fixed listener, greedy decoding   &     -100.674     &         -36.419              &       1.400       &      0.005             &       0.814         \\ \hline
+			 Baseline random pairs, pure decoding   & -136.114        &      -72.959            &       1.065          &      0.002               &       0.550       \\ \hline
+			 Baseline random pairs, greedy decoding   &-100.187      &    -35.910            &       1.355          &      0.006            &       0.544       \\ \hline
+			 Baseline similar pairs, pure decoding   &     -137.491& -77.898    & 0.198    &   -0.005    &  0.542        \\ \hline
+			 Baseline similar pairs, greedy decoding   &   -101.436  &      -38.911        &     0.044   &     0.003     &  0.565           \\ \hline
 			 
 	\end{tabularx}
 \caption{\label{tab:coco_greedy}Language drift metrics and listener test accuracies (``Acc.'') on MS COCO experiments conducted with greedy decoding.}
@@ -382,20 +382,20 @@ Summarizing the experiments on the MS COCO dataset, it was shown that artificial
 The goal of these experiments was to investigate the importance of presenting exhaustive example captions to the model during training for potentially mitigating language drift. To this end, the 3Dshapes dataset was annotated with exhaustive captions (see Section \ref{ds:3dshapes}) and various experiments were conducted. %Additionally, these experiments focus on investigating the model's potential to generate informative captions, without being overinformative. \pt{spell out the operationalization}
 
 \begin{table}[] 
-	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
+	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|}
 		\hline
-		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. (random)} & \textbf{Acc. (similar)} \\ \hline
-		Ground truth exh.       &      -164.752            &         -101.329               &       6.881             &      0.023               &                 &                \\ \hline
-		Pretrained 3D exh. speaker                            &       -195.753            &         -145.638               &        5.428              &      0.001                & 0.953 (random listeners)                 & 0.808 (similar listeners)                 \\ \hline
-		3D Baseline, random, $\lambda_s = 0$ &       -195.420            &    -147.938                    &           5.294            &      -0.002                &                 0.979                         &                                           \\ \hline
-		3D Baseline, random, $\lambda_s = 0.25$     &     -196.811              &       -140.862                 &          5.104            &       -0.006               &          0.969                                &                                           \\ \hline
-		3D Baseline, random, $\lambda_s = 0.5$   &         -196.722          &        -144.301                &        4.968              &          0.002            &                  0.971                      &                                           \\ \hline
-		3D Baseline, random, $\lambda_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
-		3D Baseline, random, $\lambda_s = 1$   &      -196.019             &            -137.456             &        5.257              &          -0.005            &              0.979                            &                                           \\ \hline
-		3D fixed listener, random, $\lambda_s = 0$&      -196.111          &     -136.134                  &             5.339         &         -0.008            &                   0.927                      &                                           \\ \hline
-		3D fixed listener, random, $\lambda_s = 0.75$&      -194.990          &     -140.483                  &             5.298         &         -0.003            &                   0.927                      &                                           \\ \hline
-		3D fixed listener, similar fixed, same test &  -198.434       &      -147.121     &     2.892 &    0.025         &        &      0.744          \\ \hline
-		3D fixed listener, similar fixed, diff. test & -198.188   & -143.309      & 2.187   & 0.045    &    &   0.822     \\ \hline
+		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc.}  \\ \hline
+		Ground truth exh.       &      -164.752            &         -101.329               &       6.881             &      0.023               &       0.998 (fixed listener)         \\ \hline
+		Pretrained 3D exh. speaker                            &       -195.753            &         -145.638               &        5.428              &      0.001                & 0.920 (fixed listener)            \\ \hline
+		3D Baseline, random, $\lambda_s = 0$ &       -195.420            &    -147.938                    &           5.294            &      -0.002                &                 0.979                 \\ \hline
+		3D Baseline, random, $\lambda_s = 0.25$     &     -196.811              &       -140.862                 &          5.104            &       -0.006               &          0.969                      \\ \hline
+		3D Baseline, random, $\lambda_s = 0.5$   &         -196.722          &        -144.301                &        4.968              &          0.002            &                  0.971            \\ \hline
+		3D Baseline, random, $\lambda_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979               \\ \hline
+		3D Baseline, random, $\lambda_s = 1$   &      -196.019             &            -137.456             &        5.257              &          -0.005            &              0.979               \\ \hline
+		3D fixed listener, random, $\lambda_s = 0$&      -196.111          &     -136.134                  &             5.339         &         -0.008            &                   0.927              \\ \hline
+		3D fixed listener, random, $\lambda_s = 0.75$&      -194.990          &     -140.483                  &             5.298         &         -0.003            &                   0.927             \\ \hline
+		3D fixed listener, similar fixed, same test &  -198.434       &      -147.121     &     2.892 &    0.025 &      0.744      \\ \hline
+		3D fixed listener, similar fixed, diff. test & -198.188   & -143.309      & 2.187   & 0.045    & 0.822     \\ \hline
 	\end{tabularx}
 	\caption{\label{tab:3dshapes_drift_metrics_basic_baseline} Language drift metrics and listener test accuracies (``Acc.'') on different pairs. 
 		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding. 3D refers to the 3DShapes dataset. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar pairs. ``Overlap (d)'' refers to the discrete overlap metric, ``overlap (c)'' to continuous overlap. The speakers trained on similar pairs are still tested on random pairs.}
@@ -458,16 +458,16 @@ To sum up, similarly to MS COCO, the precise parametrization of the loss did not
 \label{expt:3dsapes_similar}
 
 \begin{table}[]
-	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
+	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|}
 		\hline
-		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. (random)} & \textbf{Acc. (similar)} \\ \hline
-		Ground truth exh.       &      -164.752            &         -101.329               &       6.881             &      0.023               &                 &                \\ \hline
-		Pretrained 3D exh. speaker                            &       -195.753            &         -145.638               &        5.428              &      0.001                & 0.953 (random listeners)                 & 0.808 (similar listeners)                 \\ \hline
-		3D Baseline, random, $\lambda_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
-		3D Baseline, similar, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
-		3D Baseline, similar fixed, random test &       -193.709            &    -141.010                  &        3.280            &      -0.003         &            0.688       &                           \\ \hline
-		3D Baseline, similar fixed, same test &      -199.014        &        -146.280           &        2.875       &      0.029   &              &          0.691                   \\ \hline
-		3D Baseline, similar fixed, diff. test &     -194.510     &    -146.557          &   2.071      & 0.020    &                &              0.570          \\ \hline
+		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc.} \\ \hline
+		Ground truth exh.       &      -164.752            &         -101.329               &       6.881             &      0.023               &       0.998 (fixed listener)       \\ \hline
+		Pretrained 3D exh. speaker                            &       -195.753            &         -145.638               &        5.428              &      0.001                & 0.920 (fixed listener)         \\ \hline
+		3D Baseline, random, $\lambda_s = 0.75$  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979               \\ \hline
+		3D Baseline, similar, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              &         0.906                        \\ \hline
+		3D Baseline, similar fixed, random test &       -193.709            &    -141.010                  &        3.280            &      -0.003         &            0.688           \\ \hline
+		3D Baseline, similar fixed, same test &      -199.014        &        -146.280           &        2.875       &      0.029   &     0.691                   \\ \hline
+		3D Baseline, similar fixed, diff. test &     -194.510     &    -146.557          &   2.071      & 0.020    &     0.570          \\ \hline
 		%3D Short, similar, $\lambda_s = 0.75$&      -145.014             &      -76.474                  &             1.565         &         0.000             &                   0.885                       &                                           \\ \hline
 		%3D Short, similar fixed, same test $\lambda_s = 0.75$&      -190.010           &     -58.128                  &             2.086         &         0.001             &                   0.731                       &                                           \\ \hline
 		%3D Short, similar fixed, diff. test $\lambda_s = 0.75$&     -191.051        &        -59.088           &   1.947        &        0.002          &        0.717                               &                                           \\ \hline
@@ -552,8 +552,8 @@ In order to investigate whether it was indeed the functional task signal that wa
 Additionally, in order to address the apparent overfitting and co-adaptation of the joint speaker and listener in the previous similar pairs experiment (Section~\ref{expt:3dsapes_similar}), as was apparent from the discrepancy between the training and testing accuracies (Fig.~\ref{fig:3dshapes_wShort_similarFixed_075_speaker_losses_listener_acc}, blue lines, and Tab.~\ref{tab:3dshapes_drift_metrics_basic_similar}), a follow-up experiment with a fixed listener was conducted. It also used similar pairs matching on the three fixed categories, and exhaustive captions. 
 The training dynamics in Figure~\ref{fig:3dshapes_similarFixed_fixedListener_075_speaker_loss_listener_acc} were similar to the training on random pairs (cf.~Fig.~\ref{fig:3dshapes_fixed_listener_0_075_speaker_losses_listener_acc}), and resulted in a lower training accuracy than with the joint listener. The test accuracies both on the same features and different features test sets were closer to the training accuracy (Tab.~\ref{tab:3dshapes_drift_metrics_basic_baseline}, last two lines), showing that the discrepancy between trainining and test accuracy in Section \ref{expt:3dsapes_similar} was at least to some extend due to speaker-listener co-adaptation on the trianing dataset. At the same time, the listener's accuracy did not improve beyond pretraining level (it was, in fact, worse than the pretraining test accuracy on random pairs), indicating that the speaker did not adapt her messages to functional needs much. Surprisingly, the test accuracy was higher on the different features test set than on the same features set. This could be attributed to potential differences in the listener's ability to discriminate the particular features belonging to either set, as induced by the pretraining. Compared to the accuracy difference between the test sets in the joint listener experiment, it can also be inferred that reference game fine-tuning for two epochs was not sufficient for overriding the agents' capabilities learned during pretraining in the fixed listener experiment, like communicating about features which were not part of the reference game training but were used in the pretraining.
 
-Visually, the drift dynamics during training also did not differ between the fixed and the joint listener experiments (Fig.~\ref{fig:3dshapes_similarFixed_fixedListener_075_str_sem_drift}~vs.~Fig.~\ref{fig:3dshapes_wShort_similarFixed_075_str_sem_drift}, blue and green lines). Interestingly, in contrast to random pairs, the semantic drift values did not improve with the fixed listener compared to the joint listener on the same features test set, but did improve on the different features test set (Tab.~\ref{tab:3dshapes_drift_metrics_basic_baseline}~vs.~Tab.~\ref{tab:3dshapes_drift_metrics_basic_similar}). The results were the other way around for structural drift. The discrete overlap was higher for both tests for the fixed listener than the joint one, and so was the continuous overlap on the different features test set.
-Taken together, these results indicate that given more complex visual input, the listener grounding was more susceptible to overfitting, yet the functional signal was not strong enough so as to result in speaker-listener co-adaptation measured by semantic drift. Therefore, it seems to be a difficult task to fine-tune the speaker for a task on complex visual input in a way that provides a sufficiently strong task success signal, while also achieving a good generalization performance. 
+Visually, the drift dynamics during training also did not differ between the fixed and the joint listener experiments (Fig.~\ref{fig:3dshapes_similarFixed_fixedListener_075_tr_sem_drift}~vs.~Fig.~\ref{fig:3dshapes_wShort_similarFixed_075_str_sem_drift}, blue and green lines). Interestingly, in contrast to random pairs, the semantic drift values did not improve with the fixed listener compared to the joint listener on the same features test set, but did improve on the different features test set (Tab.~\ref{tab:3dshapes_drift_metrics_basic_baseline}~vs.~Tab.~\ref{tab:3dshapes_drift_metrics_basic_similar}). The results were the other way around for structural drift. The discrete overlap was higher for both tests for the fixed listener than the joint one, and so was the continuous overlap on the different features test set.
+Taken together, these results indicate that given more complex visual input, the listener grounding was more susceptible to overfitting, yet the functional signal was not strong enough so as to result in speaker-listener co-adaptation measured by semantic drift. Therefore, it seems to be a difficult task to fine-tune the speaker for a task on complex visual input in a way that provides a sufficiently strong task success signal, while also achieving a good generalization performance.
 
 \begin{figure}[h]
 	\centering
@@ -576,21 +576,21 @@ Additionally, it was shown that training with a fixed listener on more complex v
 \label{expt:3dshapes_short}
 
 \begin{table}[] 
-	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|X|}
+	\begin{tabularx}{\textwidth}{|X|l|l|X|X|X|}
 		\hline
-		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc. (random)} & \textbf{Acc. (similar)} \\ \hline
-		Ground truth mixed       &     -139.026            &    -80.323             &       7.401        &        0.028        &                 &                \\ \hline
-		Pretrained 3D mixed speaker    &      -192.903           &         -59.623               &        2.309              &      -0.001                & 0.944 (baseline listeners)                 &                 \\ \hline
+		\textbf{Model name}                                    & \textbf{log $P(m)$} & \textbf{log $P(m \mid i)$} & \textbf{Overlap (d)} & \textbf{Overlap (c)} & \textbf{Acc.} \\ \hline
+		Ground truth mixed       &     -139.026            &    -80.323             &       7.401        &        0.028        &                         \\ \hline
+		Pretrained 3D mixed speaker    &      -192.903           &         -59.623               &        2.309              &      -0.001                & 0.944 (3D Short random listeners)        \\ \hline
 		%3D Baseline, random  &       -195.495        &           -147.313           &          5.247            &         0.001             & 0.979                                    &                        0.959                   \\ \hline
 		%3D Baseline, similar all, $\lambda_s = 0.75$ &      -198.189             &       -140.786                 &           5.578           &        0.001              & 0.878                      &            0.906                        \\ \hline
 		%3D Baseline, similar fixed, random test &       -193.709            &    -141.010                  &        3.280            &      -0.003         &            0.688       &                           \\ \hline
 		%3D Baseline, similar fixed, same test &      -199.014        &        -146.280           &        2.875       &      0.029   &              &          0.691                   \\ \hline
 		%3D Baseline, similar fixed, diff. test &     -194.510     &    -146.557          &   2.071      & 0.020    &                &              0.570          \\ \hline
-		3D Short, random&      -189.285             &      -58.278                  &             2.316        &         0.000             &                   0.957                       &                                           \\ \hline
-		3D Short, similar all, $\lambda_s = 0.75$&     -194.183        &   -59.371           &    1.032       &   0.000        &                   &         0.791       \\ \hline
-		3D Short, similar fixed, random test&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726                       &                                        \\ \hline
-		3D Short, similar fixed, same test&      -192.130      &     -58.753      &   0.837      & 0.003      &                       &               0.723                           \\ \hline
-		3D Short, similar fixed, diff. test &  -187.713       & -57.257     & 1.915        &  0.002         &      &     0.564       \\ \hline
+		3D Short, random&      -189.285             &      -58.278                  &             2.316        &         0.000             &                   0.957      \\ \hline
+		3D Short, similar all, $\lambda_s = 0.75$&     -194.183        &   -59.371           &    1.032       &   0.000        &        0.791       \\ \hline
+		3D Short, similar fixed, random test&      -188.249           &     -121.830                  &             1.839         &         -0.001             &                   0.726         \\ \hline
+		3D Short, similar fixed, same test&      -192.130      &     -58.753      &   0.837      & 0.003   &     0.723                \\ \hline
+		3D Short, similar fixed, diff. test &  -187.713       & -57.257     & 1.915        &  0.002   &    0.564       \\ \hline
 	\end{tabularx}
 	\caption{\label{tab:3dshapes_drift_metrics_basic_short} Language drift metrics and listener test accuracies (``Acc.'') of experiments on the 3Dshapes dataset including short annotations. 
 		``Baseline'' refers to the setup wherein the listener is trained jointly with the speaker, using pure decoding, using exhaustive captions only. ``Random'' refers to speakers trained on random target-distractor pairs; ``similar'' refers to speakers trained on similar target-distractor pairs. $\lambda_s = 0.75$ is used in all experiments. ``Mixed'' and ``short'' refers to experiments and tests with annotation of varying lengths.}
