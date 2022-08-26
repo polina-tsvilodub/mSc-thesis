@@ -1,7 +1,8 @@
-\section{MS COCO}
+\section{Datasets}
+\subsection{MS COCO}
 The MS COCO dataset \parencite{chen2015microsoft} contains 12 superordinate categories which contain 80 basic-level categories. Table \ref{tab:app_coco_categories} presents the mappings of the categories as well as the occurrence counts in the train split of the dataset. 
 
-\begin{table}[]
+\begin{table}[h]
 	\begin{tabularx}{\linewidth}{|X|X|l|}
 		\hline
 		\textbf{Superordinate category}                                    & \textbf{Basic-level categories} & \textbf{Counts}  \\ \hline
@@ -22,8 +23,21 @@ The MS COCO dataset \parencite{chen2015microsoft} contains 12 superordinate cate
 	\caption{\label{tab:app_coco_categories} MS COCO basic-level object categories mapped to their superordinate categories, along with counts of the superordinate categories in the train split.}
 \end{table}
 
-\section{REINFORCE Pseudo-algorithm}
-\pt{TODO}
+\subsection{3Dshapes}
+For generating natural language captions for the 3Dshapes images, descriptions for all possible values of each of the six image features (object type, size, color, background and floor colors, object's position) were put together (see Fig.~\ref{fig:3dshapes_example} for examples). Table \ref{tab:shapes_vocab} provides an overview of all descriptions used for each feature.
+
+\begin{table}[h]
+	\begin{tabularx}{\linewidth}{|c|X|}
+		
+	 \hline
+	 \textbf{Feature} & \textbf{Descriptions}\\ \hline
+	 Color & Red, orange, yellow, green, light green, cyan, medium blue, dark blue, purple, pink \\ \hline
+	 Object size & Tiny, very small, small, medium-sized, middle-sized, big, large, huge, giant \\ \hline
+	 Object type & Block, cylinder, ball, pill \\ \hline
+	 Object position & In the right corner, on the right, close to the right side, near the right corner, close to the middle, nearly in the middle, in the middle, in the middle, in the middle, nearly in the middle, close to the middle, near the left corner, close to the left side, on the left, in the left corner \\ \hline
+	\end{tabularx}
+\caption{3Dshapes feature descriptions, used for building both exhaustive and short captions.\label{tab:shapes_vocab}}
+\end{table}
 
 \section{Speaker Architecture Grid Search}
 \label{app:grid_search}
@@ -54,9 +68,6 @@ Because considering different message options, as opposed to a single maximum pr
 	\label{fig:coco_grid_pretraining_decoding}
 \end{figure}
 
-% Please add the following required packages to your document preamble:
-% \usepackage[table,xcdraw]{xcolor}
-% If you use beamer only pass "xcolor=table" option, i.e. \documentclass[xcolor=table]{beamer}
 \begin{table}[]
 	\begin{tabularx}{\textwidth}{|l|ll|ll|ll|}
 		\hline
