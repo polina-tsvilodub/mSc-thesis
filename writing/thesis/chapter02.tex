@@ -6,8 +6,6 @@ Research on modeling goal-directed communication has received increasing attenti
 
 This chapter reviews selected technical aspects and related work relevant to the main experiments of the thesis. Technical advances in machine learning architectures allowing to achieve state-of-the-art image captioning performance are reviewed in Section \ref{image_captioning}. The basics of reinforcement learning relevant for multi-agent communication are introduced in Section \ref{rl}. Table \ref{tab:defs} summarizes terms and abbreviations central for the remaining thesis. 
 
-%Literature review notes go here. \pt{This more technical stuff should go into a chapter before multi-agent communication. It can be framed as background and approaches to image captioning which are traditional in the sense that they are supervised. The transition to multi-agent communication could be task-specific or -conditional communication about visual environment which is a critically functional part of human communication. Chapter AFTER multi-agents should be language drift (jacob, lewis, andreas, 2021: multitasking inhibits drift ).}
-
 \begin{table}[]
 	\centering
 	%\begin{adjustbox}{width=1\textwidth}
@@ -34,8 +32,7 @@ This chapter reviews selected technical aspects and related work relevant to the
 
 \section{Image Captioning}
 \label{image_captioning}
-Producing sensible and informative captions for images is a task that has received a lot of attention in machine learning research over the last years, developing from the more computer vision-centric task of object detection and recognition. %Specifically, image captioning in the supervised learning domain is facilitated by the availability of large-scale image-caption datasets like ``Microsoft Common Objects in COntext'' (MS COCO) \parencite{lin2014microsoft, chen2015microsoft}. %Importantly, in this domain, producing image captions in general is the only task of the developed applications; that. is, the captions are not supposed to target any particular actionable goal other than producing captions close to the human examples seen during training---they are \textit{task-unconditional}. \pt{Point is clear, but sharpen the actual formulation. } 
-%From a machine learning perspective, the prerequisite for making image captions task-conditional would be the availability of supervised data from such a task. \pt{As discussed in the introduction, this motivates the choice of the multi-agent framework. Include and sharpen.} Nonetheless, technical advances developed in this domain provide the basis for agents employed in multi-agent settings; therefore, this section reviews selected work on image captioning in the computer vision and machine learning domain. 
+Producing sensible and informative captions for images is a task that has received a lot of attention in machine learning research over the last years, developing from the more computer vision-centric task of object detection and recognition. 
 This section focuses on introducing more recent \textit{deep} models \parencite{lecun2015deep} for image captioning that can be applied to MS COCO because this dataset is used in presented work; for an example of earlier work, see, e.g., \cite{kulkarni2013babytalk}.
 
 One of the first end-to-end deep neural image captioning architectures was developed by \cite{vinyals2015show}. Their image captioner used a CNN-based image feature extractor in order to extract vector representations from raw images, which were fed into an LSTM-based recurrent \textit{decoder} module, trained end-to-end to maximize the likelihood 
@@ -120,7 +117,7 @@ Previous work on captioning the MS COCO datase discussed in this section provide
 		\cite{vinyals2015show}  & -      & -      & -      & 0.277    & 0.237  & 0.855 \\ \hline
 		\cite{xu2015show} & 0.718  & 0.504  & 0.357  & 0.250     & 0.239  & -     \\ \hline
 		\cite{karpathy2015deep}          & 0.625  & 0.450  & 0.321  & 0.230   & 0.195  & 0.660 \\ \hline
-		\cite{zhou2019unified}          & -  & -  & -  & 0.365   & 0.284  & 1.169 \pt{?} \\ \hline
+		\cite{zhou2019unified}          & -  & -  & -  & 0.365   & 0.284  & 1.169  \\ \hline
 	\end{tabularx}
 \caption{\label{tab_coco_metrics_ref}The table shows evaluation metrics results for the quality of captions generated on respective test sets of the MS COCO dataset. Best results reported in each paper are included.}
 \end{table}
@@ -144,15 +141,6 @@ More precisely, reinforcement learning problems can be defined as learning the m
 	\caption{Interaction of the environment with the agent via states, actions and rewards \parencite[][p. 48]{sutton2018reinforcement}.}
 	\label{fig:rl}
 \end{figure}
-
-%The most important building blocks of RL systems are defined below: \pt{Definitions of: reward, environment, agents, actions, states, policy, value function, if necessary, q-learning maybe. An optiional model of the environment may also exist. }
-% \begin{itemize}
-%	\item agent: learner and decision maker in the interaction who tries to achieve a goal for a certain task.
-%	\item environment: the setting in which the agent's interactions are situated, everything outside of the agent itself.
-%	\item policy: the agent's learned mapping from environment states to actions within the environment. 
-%	\item reward signal: \pt{TBD} numerical representation of the quality single \textit{rewards} the agent receives at each timestep of the decision process. Improtantly, the agents' goal is to maximize the sumn of the rewards over the task completion.
-%	\item value function: a function mapping states to expected total reward for agents starting the actions at the given state. These are adapted and reestimated based on observed action and reward sequences of the agents over their lifetime. \pt{TBD}
-%\end{itemize}
 
 Decision making sequences modeled by reinforcement learning are standardly formalized as Markov Decision Processes (MDPs). 
 It is assumed that the interaction takes place over discrete timesteps $t = 0,1,2 ...$.\footnote{Reinforement learning can also be applied to continuous state and action spaces. These aspects are ommitted in this introduction for brevity reasons.} At each step $t$, the state $S_t \in \mathcal{S}$ is the state the agent is currently in, where $\mathcal{S}$ is the set of all possible states. Given the state, the agent selects an action $A_t \in \mathcal{A}(s)$, where $\mathcal{A}(s)$ denotes the set of all actions available in state $S_t$ at timestep $t$. At the next timestep $t+1$, the agent receives a reward $R_{t+1} \in \mathcal{R}$ for the action $A_t$ in state $S_t$. These iterations can be formalized as \textit{finite} MDPs if they consist of an $\mathcal{A}, \mathcal{S}$ and $\mathcal{R}$ with finite numbers of elements. In this case, the probability $p$ for a particular state $s'$ and reward $r'$ to occur at time $t$, conditioned on the previous state and action, is well-defined \parencite[][p. 48]{sutton2018reinforcement}:  
@@ -220,6 +208,3 @@ To sum up, this chapter reviewed related work on image captioning, which is the 
 Furthermore, important theoretical aspects of reinforcement learning were presented, allowing to better understand multi-agent communication experiments. 
 
 The next chapter describes how the methods introduced in this chapter come together in practice in work on multi-agent communication.
-
-%\pt{stationary distribution?}
-%\pt{Add machine details in the expts section}
