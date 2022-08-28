@@ -51,7 +51,7 @@ The first grid search over decoding strategies and structural loss weights, give
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=\linewidth]{images/grid_search_TF_only_Ls_decoding.png}
-	\caption{Grid search results over different $\lambda_s$ weights (columns) and decoding strategies during a reference game. Upper row shows total speaker train losses, bottom row shows listener train accuracies. Note the different y-axis scales of the last two plots in the upper row.}
+	\caption{Grid search results over different $\lambda_s$ weights (columns) and decoding strategies (color) during a reference game. Upper row shows total speaker training losses, bottom row shows listener training accuracies. Note the different y-axis scales of the last two plots in the upper row.}
 	\label{fig:coco_grid_Ls_decoding_TF_only}
 \end{figure}
 
@@ -64,14 +64,14 @@ Because considering different message options, as opposed to a single maximum pr
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=\linewidth]{images/grid_search_pretraining_Ls_decoding.png}
-	\caption{Grid search results over different pretrained speaker models, used with different decoding and $\lambda_s$ weights in a reference game. Upper row shows total speaker training losses, lower row shows listener train accuracies. Left column shows functional only training, right column shows the baseline compound training setting. ``TF'' stands for teacher forcing, ``Top-K'' stands for a speaker pretrained with top-k sampling based auto-regression only.}
+	\caption{Grid search results over different pretrained speaker models, used with different decoding strategies and $\lambda_s$ weights in a reference game. Upper row shows total speaker training losses, lower row shows listener training accuracies. Left column shows functional only training, right column shows the baseline compound training setting. ``TF'' stands for teacher forcing, ``Top-K'' stands for a speaker pretrained with top-k sampling based auto-regression only.}
 	\label{fig:coco_grid_pretraining_decoding}
 \end{figure}
 
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=\linewidth]{images/grid_search_Ls_calculation.png}
-	\caption{Grid search results over different structural loss computation strategies in a reference game. ``TF'' stands for teacher forcing, ``GT maximization'' for supervised ground truth-based structural loss computation. Left: Total speaker training losses. Right: Listener accuracies.}
+	\caption{Grid search results over different structural loss computation strategies in a reference game. ``TF'' stands for teacher forcing, ``GT maximization'' for supervised ground truth-based structural loss computation. Left: Total speaker training losses. Right: Listener training accuracies.}
 	\label{fig:coco_grid_Ls_calc}
 \end{figure}
 
