@@ -6,6 +6,7 @@ code/src/reference_game_utils/__pycache__/
 code/src/utils/__pycache__/
 code/src/agents/__pycache__/
 code/src/agents/__pycache__/speaker.cpython-37.pyc
+*/__pycache__/
 code/src/models/
 code/src/notebooks/models/
 code/src/notebooks/*.csv
