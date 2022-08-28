@@ -1,19 +1,19 @@
 \section{Datasets}
 \subsection{MS COCO}
-The MS COCO dataset \parencite{chen2015microsoft} contains 12 superordinate categories which contain 80 basic-level categories. Table \ref{tab:app_coco_categories} presents the mappings of the categories as well as the occurrence counts in the train split of the dataset. 
+The MS COCO dataset \parencite{chen2015microsoft} contains 12 superordinate categories which contain 80 basic-level categories. Table \ref{tab:app_coco_categories} presents the mappings of the categories as well as the occurrence counts in the train split of the dataset. It indicates that some categories are much more prominent, so captions for images including those categories might generally be better due to an imbalance in the training dataset.
 
 \begin{table}[h]
 	\begin{tabularx}{\linewidth}{|X|X|l|}
 		\hline
 		\textbf{Superordinate category}                                    & \textbf{Basic-level categories} & \textbf{Counts}  \\ \hline
-		Person & person & 42,151\\  \hline
+		person & person & 42,151\\  \hline
 		accessory & backpack, umbrella, andbag, tie, suitcase &11,172 \\  \hline
 		indoor & book, clovk, vase, scissors, teddy bear, hair drier, toothbrush & 9,308\\  \hline
 		appliance & microwave, oven, toaster, sink, refrigerator & 4,494 \\  \hline
 		food & banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake & 9,740 \\  \hline
 		kitchen & bottle, wine glass, cup, fork, knife, spoon, bowl & 11,226\\  \hline
 		sports & frisbee, skis, snowboard, sports ball, kite, baseball bat, baseball glove, skateboard, surfboard, tennis racket &16,240 \\  \hline
-		furniture & chair, couch, potted plant, bed, dining table, toilet & 17077\\  \hline
+		furniture & chair, couch, potted plant, bed, dining table, toilet & 17,077\\  \hline
 		outdoor & traffic light, fire hydrant, stop sign, parking meter, bench & 8,455\\  \hline
 		animal & bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe & 16,352\\  \hline
 		electronic & TV, laptop, mouse, remote, keyboard, cell phone & 7,507 \\  \hline
@@ -46,7 +46,7 @@ For conducting the experiments in this thesis, different hyperparameters of the 
 
 Due to computational constraints, not the full space of configurations was explored, but rather representative experiments in this space were conducted. The grid searches proceeded by training the speaker and listener agent with given configurations for one epoch on a reference game on 15,000 images. 
 
-The first grid search over decoding strategies and structural loss weight, given a teacher-forcing only pretrained speaker revealed that a minimal structural weight of 0.75 was necessary for a reference game with pure decoding with above chance performance (Fig. \ref{fig:coco_grid_Ls_decoding_TF_only}). For greedy decoding, the reference games were successful for all weight configurations. The only correctly implemented exponential decoding experiments were conducted with the structural weights 0.75 and 1, and did not show qualitative improvements compared to pure decoding, so this decoding strategy was left out of further experiments. Furthermore, these results indicated that pure decoding based sampling made the policy learning more difficult for the speaker compared to greedy decoding, as can be observed from the magnitude and variance of the speaker loss for $\lambda_s = 0$ (which amounts to functional-only learning; Fig. \ref{fig:coco_grid_Ls_decoding_TF_only}, upper left).
+The first grid search over decoding strategies and structural loss weights, given a teacher-forcing only pretrained speaker revealed that a minimal structural weight of 0.75 was necessary for a reference game with pure decoding with above chance performance (Fig. \ref{fig:coco_grid_Ls_decoding_TF_only}, bottom row). For greedy decoding, the reference games were successful for all weight configurations. The only correctly implemented exponential decoding experiments were conducted with the structural weights 0.75 and 1, and did not show qualitative improvements compared to pure decoding, so this decoding strategy was left out of further experiments. Furthermore, these results indicated that pure decoding based sampling made the policy learning more difficult for the speaker compared to greedy decoding, as can be observed from the magnitude and variance of the speaker loss for $\lambda_s = 0$ (which amounts to functional-only learning; Fig. \ref{fig:coco_grid_Ls_decoding_TF_only}, upper left).
 
 \begin{figure}[h]
 	\centering
@@ -57,15 +57,22 @@ The first grid search over decoding strategies and structural loss weight, given
 
 The second grid search was conducted over different speaker pretraining strategies, testing the different speakers in reference games with pure and greedy decoding, and structural weights of 0 and 0.75. Speakers pretrained with the following approaches were considered: teacher forcing only pretraining (see Section \ref{model_pretraining} for details on the pretraining modes), constant 0.5 rate teacher forcing with pure auto-regressive decoding, adaptive teacher forcing rate ($0.5^{epoch}$, pure auto-regressive decoding), scheduled sampling (\cite{bengio2015scheduled}, with pure or exponential decoding, k = 30 and k = 150 for the inverse sigmoid teacher forcing rate decay) and auto-regression only pretraining with top-k sampling with a temperature of 2 \parencite[following][]{lazaridou2020multi}.
 Based on manual inspection, the constant 0.5 teacher-forcing rate speaker was found to be more susceptible to repeating words during generation compared to the adaptive rate speaker, so that it was left out of further experiments. Similarly, the scheduled speaker was found to generate poor captions (as measured by image captioning metrics, see Tab. \ref{coco_grid_searches_speaker_pretrain}), so it was not used in reference game experiments. 
-Therefore, the adaptive rate and the top-k speakers were compared in the grid search (Fig. \ref{fig:coco_grid_pretraining_decoding}). 
-They successfully played the reference game with the structural loss weight 0.75, greedy decoding configurations slightly outperforming pure decoding for both speakers. The performance of both speakers is comparable to the respective performance of the teacher-forced only speaker (Fig. \ref{fig:coco_grid_Ls_decoding_TF_only}, third column). However, very high validation perplexities in auto-regressive mode were observed for the teacher-forced speaker, but not the adaptive  and top-k speakers (Tab. \ref{coco_grid_searches_speaker_pretrain}, last row). Auto-regressive decoding is equivalent to sampling a caption and is at the core of the reference game, and is a more cognitively plausible representation of a message generation process. Therefore, the adaptive speaker was chosen for the final experiments, as it slightly outperformed the top-k speaker across decoding strategies. Noteworthily, using a speaker pretrained with both teacher forcing and auto-regression comes at a cost of somewhat decreasing the image caption quality (see Tab. \ref{coco_grid_searches_speaker_pretrain}).
-Because considering different message options, as opposed to a single maximum probability token, is intuitively more plausible, pure decoding is considered as the main decoding strategy in the final experiments.\footnote{A more precise investigation of plausibly narrowing down the considered space of token from the entire vocabulary is left for future work} Top-k decoding was also explored as the decoding strategy in reference games, but those experiments did not yield above chance listener performance, so the strategy was not further pursued and these results are omitted.
+Therefore, the adaptive rate and top-k decoding pretrained speakers were compared in the second grid search (Fig. \ref{fig:coco_grid_pretraining_decoding}). 
+They successfully played the reference game with the structural loss weight 0.75, greedy decoding configurations slightly outperforming pure decoding for both speakers. The performance of both speakers is comparable to the respective performance of the teacher-forced only speaker (Fig. \ref{fig:coco_grid_Ls_decoding_TF_only}, third column). However, very high validation perplexities in auto-regressive mode were observed for the teacher-forced speaker, but not the adaptive  and top-k speakers (Tab. \ref{coco_grid_searches_speaker_pretrain}, last row). Auto-regressive decoding is at the core of the reference game and is a more cognitively plausible representation of the message generation process. Therefore, the adaptive speaker was chosen for the final experiments, as it slightly outperformed the top-k speaker across decoding strategies. Noteworthily, using a speaker pretrained with both teacher forcing and auto-regression comes at a cost of somewhat decreasing the image caption quality (see Tab. \ref{coco_grid_searches_speaker_pretrain}).
+Because considering different message options, as opposed to a single maximum probability token, is intuitively more plausible, pure decoding is considered as the main decoding strategy in the final experiments.\footnote{A more precise investigation of a strategy for plausibly narrowing down the considered space of tokens from the entire vocabulary is left for future work.} Top-k decoding was also explored as the decoding strategy in reference games, but those experiments did not yield above chance listener performance, so the strategy was not further pursued and these results are omitted.
 
 \begin{figure}[h]
 	\centering
 	\includegraphics[width=\linewidth]{images/grid_search_pretraining_Ls_decoding.png}
 	\caption{Grid search results over different pretrained speaker models, used with different decoding and $\lambda_s$ weights in a reference game. Upper row shows total speaker training losses, lower row shows listener train accuracies. Left column shows functional only training, right column shows the baseline compound training setting. ``TF'' stands for teacher forcing, ``Top-K'' stands for a speaker pretrained with top-k sampling based auto-regression only.}
 	\label{fig:coco_grid_pretraining_decoding}
+\end{figure}
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\linewidth]{images/grid_search_Ls_calculation.png}
+	\caption{Grid search results over different structural loss computation strategies in a reference game. ``TF'' stands for teacher forcing, ``GT maximization'' for supervised ground truth-based structural loss computation. Left: Total speaker training losses. Right: Listener accuracies.}
+	\label{fig:coco_grid_Ls_calc}
 \end{figure}
 
 \begin{table}[]
@@ -85,14 +92,7 @@ Because considering different message options, as opposed to a single maximum pr
 \caption{\label{coco_grid_searches_speaker_pretrain}Evaluation results of speaker pretraining on MS COCO with different decoding strategies during pretraining, and different testing decoding strategies. Both standard image captioning metrics and the validation caption perplexity (PPL) are reported. ``TF'' stands for teacher forcing. Scheduled sampling with pure decoding and k=150 is reported.}
 \end{table}
 
-Finally, different structural loss calculations in the reference game were considered. More specifically, a supervised calculation, i.e., a teacher forced prediction  based loss computation (``ground truth maximization'' approach)  was compared to the computation of the loss based on the auto-regressively generated caption (with pure decoding). These were compared for the teacher-forced only pretraining speaker and the adaptive speaker, with a structural loss weight of 0.75.
+Finally, different structural loss calculations in the reference game were considered. More specifically, a supervised calculation, i.e., a teacher forced prediction  based loss computation (``ground truth maximization'' approach)  was compared to the computation of the loss based on the auto-regressively generated caption (with pure decoding). The former is equivalent to next word prediction based loss computation. These were compared for the teacher-forced only pretraining speaker and the adaptive speaker, with a structural loss weight of 0.75.
 It was found that there only was a difference in performance when the auto-regressive generation proceeded with pure decoding, but not with greedy decoding, therefore, only the pure decoding comparison is shown in Figure \ref{fig:coco_grid_Ls_calc}. Despite the slightly better listener performance under the ground truth maximization approach (dashed lines, right plot), the auto-regressive approach was selected for the final experiments due to its plausibility for the reference game setting. That is, it is considered more plausible that the structural constraints are computed based on messages actually generated by the speaker agent as she sees fit given the image, and not on miracuolously available teacher-forced ground truth messages. 
 
-\begin{figure}[h]
-	\centering
-	\includegraphics[width=\linewidth]{images/grid_search_Ls_calculation.png}
-	\caption{Grid search results over different structural loss computation strategies in a reference game. ``TF'' stands for teacher forcing, ``GT maximization'' for supervised ground truth-based structural loss computation. Left: Total speaker training losses. Right: Listener accuracies.}
-	\label{fig:coco_grid_Ls_calc}
-\end{figure}
-
-Other parameters like mean baseline subtraction in the REINFORCE update computation, different wntropy regularization weights, and adaptive learning rates for the optimizers were also explored in single experiments, but did not yield observable improvements in terms of reference game performance. Therefore, those experiments are not reported, and these configurations are not used in the final experiments.
+Other parameters like mean baseline subtraction in the REINFORCE update computation, different entropy regularization weights and adaptive learning rates for the optimizers were also explored in single experiments, but did not yield observable improvements in terms of reference game performance. Therefore, those experiments are not reported, and respective configurations are not used in the final experiments.
