@@ -22,7 +22,7 @@ Below, the structure ad the critical functional components of the code base are 
         * `image_captioner.py`: vanilla speaker module replication for purposes of loading in the language drift metric computations.
         * `metrics.py`: contains implementations of all language drift measures employed in this work: semantic, structural and functional (discrete and continuous overlaps) drifts.
     * `notebooks`: directory with notebooks used for exploring, evaluating the models and plotting the results.
-        * `coco_captions/`: directory containing image caption evaluation scripts adapted from (https://github.com/daqingliu/coco-caption)[https://github.com/daqingliu/coco-caption]. Contact author in order to receive them (not commited due to size).
+        * `coco_captions/`: directory containing image caption evaluation scripts adapted from https://github.com/daqingliu/coco-caption. Contact author in order to receive them (not commited due to size).
         * `compute_language_drift.ipynb`: notebook for computing test performances and language drift metrics on the test splits.
         * `dalle_mini_inference.ipynb`: notebook attempting to run the text-to-image DALL-E mini model (does not work).
         * `dataset_exploration.ipynb`: notebook for exploring the properties and examples of the MS COCO dataset.
