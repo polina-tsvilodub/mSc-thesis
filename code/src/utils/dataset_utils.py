@@ -582,14 +582,10 @@ class threeDshapes_Dataset(Dataset):
 
             # get ann / img ID slice
             target_img_ids = self._img_ids_flat[(i_step-1)*self.batch_size : i_step*self.batch_size]
-            # print("target_img_ids", target_img_ids)
             target_labels = [self.numeric_labels[int(i)] for i in target_img_ids]
-            # print("target_labels", target_labels)
             # select at random 3 categories along which the image should be constant in this batch
             sel_categories = np.random.choice(list(self.categories.keys()), size=3, replace=False) # ["floor_hue", "orientation", "scale"] # ["wall_hue", "object_hue", "shape"] #   # 
             sel_categories_inds = [list(self.categories.keys()).index(c) for c in sel_categories]
-            # print("Selected categories: ", sel_categories)
-            # print("Selected categories inds: ", sel_categories_inds)
             # create a container for the distractor indices
             distractor_inds = []
             
@@ -619,25 +615,19 @@ class threeDshapes_Dataset(Dataset):
                         
                         distractor_img_ind = possible_inds[j]
                         j += 1
-                        # print("distractor_img_ind", distractor_img_ind)
                         # convert retrieved distractor image index into distractor annotation index
                         distractor_ann_ind = np.where([self._img_ids_flat[i] == str(distractor_img_ind) for i in range(len(self._img_ids_flat))])[0]
                         # print("distractor_ann_id", distractor_ann_ind)
                         try:
-                            # print("trying")
                             distractor_inds.append(int(distractor_ann_ind[0]))
                         except IndexError:
-                            # print("except")
                             continue  
                         dummy_flag = True
                 except IndexError:
                     raise Exception                            
-            # print("Selected cats: ", sel_categories)
-            # print("Number of distractor inds: ", len(distractor_inds))
             
             # print("target img ind: ", target_img_ids)
             inds_tuples = list(zip(list(range((i_step-1)*self.batch_size, i_step*self.batch_size)), distractor_inds)) #list(zip(indices_t, indices_d))
-            # print("tuples: ", inds_tuples)
             # double check that target and distractor aren't the same image
             
             return inds_tuples
