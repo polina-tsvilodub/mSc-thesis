@@ -12,8 +12,11 @@ code/src/notebooks/models/
 code/src/notebooks/*.csv
 code/src/notebooks/*.pkl
 code/src/drift_metrics/torch_utils/
+code/src/train_logs/
+code/src/runs/
 writing/thesis/main.pdf
 writing/thesis/main-blx.bib
+code/.ipynb_checkpoints/
 *.aux
 *.bbl
 *.bcf
