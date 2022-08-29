@@ -33,7 +33,6 @@ class ListenerEncoderRNN(nn.Module):
     def forward(self, captions):
         # initialize hidden layer
         # check if this isn't reinitializing the hidden state in the middle of the sequence
-#         self.hidden = self.init_hidden(self.hidden_size)
         embeddings = self.embed(captions)
         hiddens, self.hidden = self.lstm(embeddings)
 
@@ -103,9 +102,7 @@ class FixedRSAListener(nn.Module):
         prob2 = P(M | image2), as a sample from the respective categorical distribution.
         """
         probs = torch.cat((prob1, prob2), dim = 0).reshape(prob1.shape[0], -1)
-        # print("Porbs shape when cast to tensor ", probs.shape)
         cat_dist = torch.distributions.categorical.Categorical(logits=probs)
         choices = cat_dist.sample()
-        # print("Fixed Listener choices: ", choices)
 
         return choices

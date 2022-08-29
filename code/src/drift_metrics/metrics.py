@@ -38,15 +38,13 @@ class DriftMeter():
         # instantiate models
         # ignore if they're not instantiated (e g when using in speaker pretraining)
         if semantic_decoder is not None:
-            # self.semantic_encoder = resnet_encoder.EncoderCNN(self.visual_embed_size)
             self.semantic_decoder = image_captioner.DecoderRNN(self.embed_size, self.hidden_size, self.vocab_len, self.visual_embed_size) #image_captioner.ImageCaptioner(self.embed_size, self.hidden_size, self.vocab_len) # this is a 1-image conditioned one now (with prepenading of embedding)
-            # self.semantic_encoder.load_state_dict(torch.load(self.encoder))
-            self.semantic_decoder.load_state_dict(torch.load(self.decoder))
+            try:
+                self.semantic_decoder.load_state_dict(torch.load(self.decoder))
+            except:
+                self.semantic_decoder.load_state_dict(torch.load(self.decoder, map_location=torch.device('cpu')))
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            # self.semantic_encoder.to(device)
             self.semantic_decoder.to(device)
-            # set to .eval()
-            # self.semantic_encoder.eval()
             self.semantic_decoder.eval()
             self.hidden_state = self.semantic_decoder.init_hidden(64)
         # softmax for computing the probabilities over the scores
@@ -70,15 +68,10 @@ class DriftMeter():
         """
         overlap_scores = []
         for j in range(generated_caps.shape[0]):
-            # target_score_list = [i == j for i, j in list(zip(generated_cap, target_cap))]
             target_score_list = [i in target_caps[j] for i in generated_caps[j]]
-            # target_score_list = torch.eq(generated_cap, target_cap)
-            # distractor_score_list = [i == j for i, j in list(zip(generated_cap, distractor_cap))]
             distractor_score_list = [i in distractor_caps[j] for i in generated_caps[j]]
-            # distractor_score_list = torch.eq(generated_cap, distractor_cap)
             overlap_score = sum(target_score_list) - sum(distractor_score_list)
             overlap_scores.append(overlap_score)
-        # overlap_score = target_score_list.sum(dim=1) - distractor_score_list.sum(dim=1) 
         
         return sum(overlap_scores)/len(overlap_scores)
 
@@ -108,12 +101,13 @@ class DriftMeter():
         return overlap_score.item() 
 
     # old metric
-    def semantic_drift(self, caption, image):
+    def semantic_drift(self, caption, image, return_batch_average=True):
         """
         P(caption|image) under image caption model pretrained on one image only.
         
         image: (batch_size, 3, 224, 224)
         caption: (batch_size, caption_len)
+        return_batch_average: whether to average over the batch (needs to be False for fixed listener).
         
         Returns:
         -------
@@ -121,11 +115,9 @@ class DriftMeter():
                 Tensor of conditional log probabilities measuring the semantic drift. 
         """
         # load pretrained models
-        # print("semantic drift shapes ", caption.shape, image.shape)
         sent_probs = []
         with torch.no_grad():   
             # embed image
-            # features = self.semantic_encoder(image)
             # pass image, embedded caption through lstm
             if len(caption.shape) < 2:
                 batch_size = 1
@@ -133,20 +125,14 @@ class DriftMeter():
                 caption = caption.unsqueeze(0)
             else:
                 batch_size = caption.shape[0]
-            hidden = self.hidden_state #self.semantic_decoder.init_hidden(batch_size)
-            scores, h = self.semantic_decoder(image, caption, hidden) # image.unsqueeze(0), caption.unsqueeze(0)
-            # print("raw caption length ", caption[0].shape)
-            
+            hidden = self.hidden_state 
+            scores, h = self.semantic_decoder(image, caption, hidden) 
             # retrieve log probs of the target tokens (probs at given indices) 
             scores_prob = self.softmax(scores) 
-            # print("scores shape ", scores_prob[0].shape)
-            # print("scores prob in drift meter: ", scores_prob.shape)
             max_preds, max_inds = torch.max(scores_prob, dim = -1)
-            # print("Max inds in drift meter : ", max_inds.shape)
             # exclude START and END tokens
             sent_probs = []
             for num in list(range(batch_size)):
-                # print("num , cap ", caption[num])
                 sent_probs.append(
                     torch.stack(
                         [scores_prob[num][i][j] for i, j in enumerate(caption[num][:-1])] # cut off hypothesized end token; start token wasnt appended during generation by design  
@@ -154,11 +140,10 @@ class DriftMeter():
                 ) 
 
             # compute log probability of the sentence
-            # print("raw word probs", sent_probs)
-            # print("probs stacked before reduction ", torch.stack(sent_probs).shape)
             prob = torch.log(torch.stack(sent_probs)).sum(dim=1)
-            # print("prob ", prob.shape, prob)
         # return softmax output for usage in KL divergence computation
+        if return_batch_average:
+            prob = prob.mean()
         return prob, scores_prob
 
     def structural_drift(self, caption):
@@ -167,7 +152,6 @@ class DriftMeter():
         
         Caption needs to be natural language str.
         """
-        # inputs_str = clean_sentence(caption)
         inputs = self.tokenizer(caption, return_tensors="pt")
         with torch.no_grad():
             # pass labels in order to get neg LL estimates of the inputs as the loss
@@ -198,5 +182,4 @@ class DriftMeter():
             cos_sim_batch = cos_sim.mean(dim=-1)
         else:
             cos_sim_batch = cos_sim
-        # print("Image cos similarity ", cos_sim_batch)
         return cos_sim_batch.item()

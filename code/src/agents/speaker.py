@@ -4,9 +4,6 @@ import torchvision.models as models
 import numpy as np
 import random
 
-# set random seed
-torch.manual_seed(1234)
-random.seed(1234)
 
 class DecoderRNN(nn.Module):
     def __init__(self, embed_size, hidden_size, vocab_size, visual_embed_size, batch_size=64, num_layers=1):
@@ -167,19 +164,10 @@ class DecoderRNN(nn.Module):
 
         output.append(cat_samples)
         cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
-        # print("Cat samples ", cat_samples)
         log_probs.append(log_p)
-        # output.append(cat_samples)
-        # word_emb = self.embed(cat_samples)
-
+        
         for i in range(max_sequence_length-1):
-            # print("CAT SAMPLES AT BEGINNING OF SAMPLING LOOP ", cat_samples)
             out, hidden_state = self.forward(inputs, cat_samples, hidden_state)
-            # lstm_out, hidden_state = self.lstm(word_emb, hidden_state)
-            # print("Self out after an iter of sampling loop: ", out.shape )
-            # out = self.linear(lstm_out)
-            
-            # get and save probabilities and save raw outputs
             
             ####
             if decoding_strategy == "pure":
@@ -212,7 +200,6 @@ class DecoderRNN(nn.Module):
                 for i in range(topk_inds.shape[0]):
                     index2zero = torch.zeros(probs.shape[-1]) # , dtype=bool
                     index2zero[topk_inds[i, : , :].squeeze(0).squeeze(0)] = 1
-                    # probs[i, :, index2zero] = 0.0
                     probs[i] = probs[i] * index2zero
                 probs = softmax(probs)
                 cat_dist = torch.distributions.categorical.Categorical(probs)
@@ -225,12 +212,8 @@ class DecoderRNN(nn.Module):
             raw_outputs.append(out)
             output.append(cat_samples)
             cat_samples = torch.cat((cat_samples, cat_samples), dim=-1)
-            # print("Cat samples ", cat_samples)
             log_probs.append(log_p)
             
-        # print("Len raw outputs ", len(raw_outputs))
-        # print(raw_outputs[0].shape)
-        # print(raw_outputs[1].shape)
         output = torch.stack(output, dim=-1).squeeze(1)
         # stack
         log_probs = torch.stack(log_probs, dim=1).squeeze(-1)
@@ -248,7 +231,5 @@ class DecoderRNN(nn.Module):
             log_probs[pos, i:] = 0
             entropies[pos, i:] = 0
         ####
-        # print('raw stacked outputs in sampling before applying view: ', torch.stack(raw_outputs, dim=1).shape)
         raw_outputs = torch.stack(raw_outputs, dim=1).squeeze(2)  #view(batch_size, -1, self.vocabulary_size)
-        # print('raw outputs as received in training loop: ', raw_outputs.shape)
         return output, log_probs, raw_outputs, entropies

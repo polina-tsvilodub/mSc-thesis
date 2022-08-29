@@ -7,9 +7,9 @@ do
         do
             cd ../src && python ../src/reference_game_train.py -ep=2 -ex="coco"\
             -dv="notebooks/val_split_IDs_from_COCO_train_tensor.pt" -ms=15\
-            -b=64 -l="../../data/final/reference_games/coco/ref_game_coco_pure_decoding_Ls075_4000vocab_random.txt" -vf="../../data/vocab4000.pkl" -tl="../../data/final/reference_games/coco/losses_ref_game_coco_pure_decoding_Ls075_4000vocab_random_"\
-            -tm="../../data/final/reference_games/coco/metrics_ref_game_coco_pure_decoding_Ls075_4000vocab_random_" -vl="" -vm=""\
-            -s_pre=$sp -n_img=0 -p="random" -l_s=$i -str=$j -entr=0.1
+            -b=64 -l="../../data/final/reference_games/coco/ref_game_coco_pure_decoding_Ls025_4000vocab_random.txt" -vf="../../data/vocab4000.pkl" -tl="../../data/final/reference_games/coco/losses_ref_game_coco_pure_decoding_Ls025_4000vocab_random_"\
+            -tm="../../data/final/reference_games/coco/metrics_ref_game_coco_pure_decoding_Ls025_4000vocab_random_" -vl="" -vm=""\
+            -s_pre=$sp -n_img=0 -p="random" -l_s=$i -str=$j -entr=0.1 -l_t="joint"
         done
     done
 done 

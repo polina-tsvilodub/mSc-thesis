@@ -46,14 +46,12 @@ class MeanBaseline():
         Update current baseline based on new reward.
         """
         if not torch.is_tensor(reward):
-            # print("transofrming rewards")
             reward = torch.tensor(reward)
         # TODO: assume i do this element-wise (sentence wise), and then batch-average at end
         # print(reward)
         self.n_steps += 1
         self.mean_baseline += (reward - self.mean_baseline) / self.n_steps
         
-        # print("--- N STEPS ---- ", self.n_steps)
         
     def get(self):
         """
@@ -70,9 +68,7 @@ def clean_sentence(captions, data_loader):
     
     for idx in captions:
         list_string = []
-#         print(idx)
         for i in idx:
-#             print("i: ", i)
             try:
                 list_string.append(data_loader.dataset.vocab.idx2word[i.item()])
             except ValueError:

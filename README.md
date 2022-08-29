@@ -43,16 +43,13 @@ Below, the structure ad the critical functional components of the code base are 
     * `pretrain_speaker.py`: entrypoint script for pretraining the speakers (on eother dataset).
     * `reference_game_train.py`: entrypoint for the reference game experiments on either dataset with any configurations considered in the thesis.
 
-
-### some file and functionality explanations 
-
-### Tracking of experiments
+### Tracking experiments
 
 Results of grid searches conducted prior to main experiments were tracked with the MLOps package `sacred` which additionally allows the visualization of results via a graphical dashboard `Omniboard`. In order to set up the experiment tracking, do:
 * install `sacred` via `pip install sacred`
 * add the experiment logging as it is exemplified in `src/reference_game_train.py`
 * run the `docker-compose.yml` file by calling `docker-compose up` (requires docker)
-* access Omniboard on [localhost:9000](localhost:9000)
+* access Omniboard at (localhost:9000)[localhost:9000]
 * contact author regarding information about the `.env` file required for running this stack
 
 ### Requirements

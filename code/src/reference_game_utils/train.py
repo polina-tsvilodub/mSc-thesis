@@ -34,7 +34,7 @@ def validate_game_compute_metrics(
     -------
 
     """
-    # TODO track at which main loop steps this is happening
+    
     val_running_loss = 0.0
     val_running_ppl = 0.0
     counter = 0
@@ -60,7 +60,7 @@ def validate_game_compute_metrics(
     criterion = nn.CrossEntropyLoss().cuda() if torch.cuda.is_available() else nn.CrossEntropyLoss()
     for val_iter in range(1):
         print("Validation iteration ", val_iter)
-        for i in range(3): #range(1, total_steps+1):
+        for i in range(3): 
             print("validation step ", i)
             # compute validation loss and PPL
             with torch.no_grad():
@@ -107,23 +107,20 @@ def validate_game_compute_metrics(
                 ############
                 # structural drift under a pretrained LM
                 
-                # TODO check masking tokens after end : rather upon first pad everything afterwards should be pad also
                 semantic_drift, _ = drift_meter.semantic_drift(captions_pred, both_images)
                 semantic_drifts.append(semantic_drift)
-                # print("----- Semantic drift ---- ", semantic_drift)
                 # for comparison, compute semantic drift of ground truth caption
                 semantic_drift_true, _ = drift_meter.semantic_drift(captions, both_images)
                 semantic_drifts_true.append(semantic_drift_true)
-                # print("----- Semantic drift ground truth ---- ", semantic_drift_true)
-
+                
                 # overlap based drift metrics
                 discrete_overlap = drift_meter.compute_discrete_overlap(captions_pred, captions, dist_captions)
                 discrete_overlaps.append(discrete_overlap)
                 
                 # get embeddings of the captions for discrete overlap computation
-                _ , prediction_embs = speaker_decoder.forward(both_images, captions_pred, init_hidden)#decoder.embed(cat_samples)
-                _, target_embs = speaker_decoder.forward(both_images, captions, init_hidden) #decoder.embed(target_captions[i])
-                _ , distractor_embs = speaker_decoder.forward(both_images, dist_captions, init_hidden)#decoder.embed(cat_samples)
+                _ , prediction_embs = speaker_decoder.forward(both_images, captions_pred, init_hidden)
+                _, target_embs = speaker_decoder.forward(both_images, captions, init_hidden) 
+                _ , distractor_embs = speaker_decoder.forward(both_images, dist_captions, init_hidden)
                 cont_overlap = drift_meter.compute_cont_overlap(prediction_embs[0].squeeze(), target_embs[0].squeeze(), distractor_embs[0].squeeze())
                 cont_overlaps.append(cont_overlap)
 
@@ -143,9 +140,6 @@ def validate_game_compute_metrics(
     print("Final val ppl ", val_ppl_out)
     print("eval steps: ", eval_steps)
     print("epochs out ", epochs_out)
-    # TODO check if should write a file here or return means over the different batches            
-    # possibly return lists and extend the extant ones in the main loop
-    # check if I need a particular type of return for potential early stopping
     return val_loss_out, val_ppl_out, val_losses, val_ppl, epochs_out, eval_steps,\
         structural_drifts, structural_drifts_true, semantic_drifts, semantic_drifts_true,\
         cont_overlaps, discrete_overlaps, image_similarities_val
@@ -180,11 +174,9 @@ def play_game(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = train_losses_file #"functional_training_losses_COCO_lf01_"
-    csv_metrics = train_metrics_file #"functional_training_COCO_language_drift_metrics_lf01_"
-    # csv_out = "functional_training_losses_wPretrained_coco_ls02_orig_wSampling_"
-    # csv_metrics = "functional_training_metrics_wPretrained_coco_ls02_orig_wSampling_"
-
+    csv_out = train_losses_file 
+    csv_metrics = train_metrics_file 
+    
     speaker_losses_structural = []
     speaker_losses_functional = []
     speaker_losses = []
@@ -216,7 +208,6 @@ def play_game(
     kl_coeff = 0.1
     # torch.autograd.set_detect_anomaly(True)
 
-    # embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
     speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_decoder.project.parameters()) 
     listener_params = list(listener_rnn.lstm.parameters()) + list(listener_encoder.embed.parameters()) 
     
@@ -230,24 +221,23 @@ def play_game(
 
     # init the drift metrics class
     drift_meter = metrics.DriftMeter(
-        # semantic_decoder="models/decoder-3dshapes-512dim-47vocab-rs1234-wEmb-short-5.pkl",
-        # semantic_decoder="models/decoder-3dshapes-512dim-49vocab-rs1234-exh-3.pkl", 
         semantic_decoder=pretrained_decoder_file,#"models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl", 
         structural_model="transfo-xl-wt103",  
         embed_size=512, 
         vis_embed_size=512, 
         hidden_size=512,
-        # TODO this will have to be retrained
         vocab=len(data_loader.dataset.vocab)
     )
     softmax = nn.Softmax(dim=-1)
-
+    coco_similar_indices_pairs = torch.load("notebooks/coco_similar_samePairs_indices_train_long.pt")
+    shuffle(coco_similar_indices_pairs)
     # mean reward baseline variance stabilisation
     mean_baseline = update_policy.MeanBaseline()
 
     # create a list of "steps" which can be shuffled as a proxy for shuffling the indices of the images used for batching
     steps_nums = list(range(1, total_steps+1))
     
+    dataloader_exception_counter_train = 0
     with torch.autograd.set_detect_anomaly(True):
         for epoch in range(1, num_epochs+1):
             # manually shuffle the indices
@@ -263,15 +253,23 @@ def play_game(
                 if pairs == "random":
                     indices_pairs = data_loader.dataset.get_func_train_indices(i_step)
                 else:
-                    indices_pairs = data_loader.dataset.get_func_similar_train_indices(i_step)
-
+                    if experiment == "coco":
+                        indices_pairs = coco_similar_indices_pairs[((i_step-1)*batch_size):(i_step*batch_size)]
+                        indices_pairs = [i for j in indices_pairs for i in j]
+                    else:
+                        indices_pairs = data_loader.dataset.get_func_similar_train_indices(i_step)
                 sanity_check_inds.append(indices_pairs)
                 # Create and assign a batch sampler to retrieve a target batch with the sampled indices.
                 new_sampler_pairs = torch.utils.data.sampler.SubsetRandomSampler(indices=indices_pairs)
                 
                 data_loader.batch_sampler.sampler = new_sampler_pairs
                 # Obtain the target batch.
-                images1, images2, target_features, distractor_features, captions, dist_captions = next(iter(data_loader))
+                try:
+                    images1, images2, target_features, distractor_features, captions, dist_captions = next(iter(data_loader))
+                except:
+                    dataloader_exception_counter_train += 1
+                    continue
+                # print("batch shape check ", target_features.shape, distractor_features.shape)
                 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
                 captions = captions.to(device)    
                 
@@ -295,21 +293,10 @@ def play_game(
                     log_probs = torch.log(captions_probs)
                     entropies = -log_probs * captions_probs
                     
-                    # end_mask = captions_pred.size(-1) - (torch.eq(captions_pred, 1).to(torch.int64).cumsum(dim=-1) > 0).sum(dim=-1)
-                    # # include the END token
-                    # end_inds = end_mask.add_(1).clamp_(max=captions_pred.size(-1)) # shape: (batch_size,)
-                    # for pos, i in enumerate(end_inds):  
-                    #     # print("end inds ", i)
-                    #     # zero out log Ps and entropies
-                    #     log_probs[pos, i:] = 0
-                    #     entropies[pos, i:] = 0
                 else:                
                 # sample caption from speaker 
                 # get predicted caption and its log probability
                     captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1, decoding_strategy=decoding_strategy)
-                print("---- GROUND TRUTH CAPTIONS ---- ", update_policy.clean_sentence(captions, data_loader)[:2])
-                print("----- DISTRACTOR TRUTH CAPTIONS ---- ", update_policy.clean_sentence(dist_captions, data_loader)[:2])
-                print("---- PREDICTED CAPTIONS ---- ", update_policy.clean_sentence(captions_pred, data_loader)[:2])
                 
                 #######
                 # CREATE TARGET DIST RANDOM PAIRS FOR THE LISTENER
@@ -329,6 +316,7 @@ def play_game(
                     targets_list.append(target)
                 features1 = torch.stack(features1_list)
                 features2 = torch.stack(features2_list)
+                # print("Targets: ", targets_list)
                 targets_list = torch.tensor(targets_list).to(device)
                 #######    
 
@@ -336,7 +324,7 @@ def play_game(
                 hiddens_scores, hidden = listener_rnn(captions_pred)
                 features = torch.cat((features1.unsqueeze(1), features2.unsqueeze(1)), dim=1)
                 predictions, scores = listener_encoder(features, hidden.squeeze(0)) 
-            
+                # print("Predictions ", predictions)
                 ######
                 # RL step
                 # if target index and output index match, 1, else -1
@@ -345,15 +333,15 @@ def play_game(
                 rewards = [1 if x else -1 for x in torch.eq(targets_list, predictions).tolist()]
                 #####
                 # mean baseline
-                if mean_baseline:
-                    b = mean_baseline.get()
-                    mean_baseline.update(rewards)
-                    rewards = torch.tensor(rewards)
-                    rewards = rewards - b 
-                    try:
-                        mean_baselines.append(b.mean().item())
-                    except AttributeError:
-                        mean_baselines.append(b)
+                # if mean_baseline:
+                #     b = mean_baseline.get()
+                #     mean_baseline.update(rewards)
+                #     rewards = torch.tensor(rewards)
+                #     rewards = rewards - b 
+                #     try:
+                #         mean_baselines.append(b.mean().item())
+                #     except AttributeError:
+                #         mean_baselines.append(b)
                 ####
                 # compute REINFORCE update
                 rl_grads = update_policy.update_policy(rewards, log_probs, entropies, entropy_weight=entropy_weight) # check if log probs need to be stacked first
@@ -369,30 +357,9 @@ def play_game(
                 # combine structural loss and functional loss for the speaker 
                 # compute distribution under pretrained model
 
-                ###########
-                # KL divergence for regularization
-                ###########
-                # semantic_drift, pretrained_prob = drift_meter.semantic_drift(captions, both_images) 
-                # # should probably also be averaged over batch for mean batch loss reduction
-                # raw_outputs_probs = softmax(raw_outputs)
-                # raw_outputs_dist = torch.distributions.categorical.Categorical(probs=raw_outputs_probs)
-                # pretrained_prob_dist = torch.distributions.categorical.Categorical(probs=pretrained_prob)
-                # # KL divs of shape (batch_size,)
-                # # print("SHAPES OF PROB TENSORS")
-                # # print(raw_outputs_probs.shape)
-                # # print(pretrained_prob.shape)
-                # kl_div = torch.distributions.kl.kl_divergence(raw_outputs_dist, pretrained_prob_dist)
-                # # print("---- sentence level KL divergence ----- ", kl_div)
-                
-                # kl_div_sents = kl_div.mean(-1)
-                # kl_div_batch = kl_div_sents.mean().item()
-                # # print("---- batch level KL divergence ----- ", kl_div_batch)
-                # kl_divs.append(kl_div_batch)
-                # TODO double check + sign and whether the kl term requires grad
-                loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) #+ kl_coeff * kl_div_batch
+                loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) 
                 speaker_loss =  lambda_s*loss_structural + lambda_f*rl_grads
                 
-                print("L_s: ", loss_structural, " L_f: ", rl_grads)
                 
                 # listener loss
                 listener_loss = criterion(scores, targets_list)
@@ -428,7 +395,6 @@ def play_game(
                 # Print training statistics (on different line).
                 if j % 200 == 0:
                     print('\r' + stats)
-                    # TODO double check
                     # also compute the drift metrics during training to check the dynamics
 
                     val_loss_out, val_ppl_out, val_losses, val_ppl, epoch_out, eval_step,\
@@ -455,25 +421,25 @@ def play_game(
                     discrete_overlaps.extend(discrete_overlap)
                     image_similarities_val.extend(image_similarity_val)
                     
-                    speaker_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'speaker_baseline_randomPairs' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" + str(j) + "steps_" )
-                    torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
-                    listener_rnn_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_rnn_baseline_randomPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" + str(j) + "steps_" )
-                    listener_encoder_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_encoder_baseline_randomPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" + str(j) + "steps_" )
-                    torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
-                    torch.save(listener_encoder.state_dict(), listener_encoder_trained_file+'%d.pkl' % epoch )
+                    # speaker_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'speaker_baseline_randomPairs' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" + str(j) + "steps_" )
+                    # torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
+                    # listener_rnn_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_rnn_baseline_randomPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" + str(j) + "steps_" )
+                    # listener_encoder_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_encoder_baseline_randomPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" + str(j) + "steps_" )
+                    # torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
+                    # torch.save(listener_encoder.state_dict(), listener_encoder_trained_file+'%d.pkl' % epoch )
 
                     # torch.save(sanity_check_inds, "sanity_check_indices_refgame_final_baseline.pt")
 
             # Save the weights.
             if epoch % save_every == 0:
-                speaker_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'speaker_baseline_similarPairs' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" )
+                speaker_trained_file = os.path.join('../../data/final/reference_games/coco/models', 'speaker_baseline_similarPairs' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" )
                 torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
-                listener_rnn_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_rnn_baseline_similarPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" )
-                listener_encoder_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_encoder_baseline_similarPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" )
+                listener_rnn_trained_file = os.path.join('../../data/final/reference_games/coco/models', 'listener_rnn_baseline_similarPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" )
+                listener_encoder_trained_file = os.path.join('../../data/final/reference_games/coco/models', 'listener_encoder_baseline_similarPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" )
                 torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
                 torch.save(listener_encoder.state_dict(), listener_encoder_trained_file+'%d.pkl' % epoch )
 
-                torch.save(sanity_check_inds, "sanity_check_indices_refgame_final_baseline.pt")
+                torch.save(sanity_check_inds, "sanity_check_indices_refgame_coco_final_baseline_Ls075_similar.pt")
             # save the training metrics
             df_out = pd.DataFrame({
                 "steps": steps,
@@ -484,7 +450,7 @@ def play_game(
                 "perplexities": perplexities,
                 "accuracies": accuracies,
                 "image_similarities": image_similarities,
-                "mean_mean_baselines": mean_baselines,
+                # "mean_mean_baselines": mean_baselines,
                 # "KL_divs": kl_divs,
             })
             df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
@@ -506,6 +472,9 @@ def play_game(
     # Close the training log file.
     f.close()
 
+    # print("global data loader exception counter ", dataloader_exception_counter)
+    print("train data loader exception counter ", dataloader_exception_counter_train)
+    
     return speaker_losses, speaker_losses_structural,\
         speaker_losses_functional, perplexities, listener_losses,\
         accuracies, structural_drifts, structural_drifts_true, semantic_drifts,\
@@ -542,11 +511,9 @@ def play_game_wFixedListener(
     # Open the training log file.
     f = open(log_file, 'w')
 
-    csv_out = train_losses_file #"functional_training_losses_COCO_lf01_"
-    csv_metrics = train_metrics_file #"functional_training_COCO_language_drift_metrics_lf01_"
-    # csv_out = "functional_training_losses_wPretrained_coco_ls02_orig_wSampling_"
-    # csv_metrics = "functional_training_metrics_wPretrained_coco_ls02_orig_wSampling_"
-
+    csv_out = train_losses_file 
+    csv_metrics = train_metrics_file 
+    
     speaker_losses_structural = []
     speaker_losses_functional = []
     speaker_losses = []
@@ -579,28 +546,18 @@ def play_game_wFixedListener(
     # torch.autograd.set_detect_anomaly(True)
 
     print("------------------- Running Fixed listener script -------------------------")
-    # embedded_imgs = torch.load("COCO_train_ResNet_features_reshaped.pt")
     speaker_params = list(speaker_decoder.embed.parameters()) + list(speaker_decoder.lstm.parameters()) + list(speaker_decoder.linear.parameters()) + list(speaker_decoder.project.parameters()) 
-    # listener_params = list(listener_rnn.lstm.parameters()) + list(listener_encoder.embed.parameters()) 
     
     # Define the optimizer.
     speaker_optimizer = torch.optim.Adam(speaker_params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
-    # listener_optimizer = torch.optim.Adam(listener_params, lr=0.001, betas=(0.9, 0.999), eps=1e-08)
-
-    # LR scheduler
-    # scheduler_s = torch.optim.lr_scheduler.StepLR(speaker_optimizer, step_size=1000, gamma=0.5)
-    # scheduler_l = torch.optim.lr_scheduler.StepLR(listener_optimizer, step_size=1000, gamma=0.5)
-
+    
     # init the drift metrics class
     drift_meter = metrics.DriftMeter(
-        # semantic_decoder="models/decoder-3dshapes-512dim-47vocab-rs1234-wEmb-short-5.pkl",
-        # semantic_decoder="models/decoder-3dshapes-512dim-49vocab-rs1234-exh-3.pkl", 
         semantic_decoder=pretrained_decoder_file,#"models/decoder-noEnc-prepend-512dim-4000vocab-rs1234-wEmb-cont-7.pkl", 
         structural_model="transfo-xl-wt103",  
         embed_size=512, 
         vis_embed_size=512, 
         hidden_size=512,
-        # TODO this will have to be retrained
         vocab=len(data_loader.dataset.vocab)
     )
     softmax = nn.Softmax(dim=-1)
@@ -622,9 +579,7 @@ def play_game_wFixedListener(
                 hidden = speaker_decoder.init_hidden(batch_size=data_loader.batch_sampler.batch_size)
                 # set mode of the models
                 speaker_decoder.eval()
-                # listener_encoder.train()
-                # listener_rnn.train()
-
+                
                 # Randomly sample a caption length, and sample indices with that length.
                 if pairs == "random":
                     indices_pairs = data_loader.dataset.get_func_train_indices(i_step)
@@ -658,21 +613,15 @@ def play_game_wFixedListener(
                 # sample caption from speaker 
                 # get predicted caption and its log probability
                 captions_pred, log_probs, raw_outputs, entropies = speaker_decoder.sample(both_images, max_sequence_length=captions.shape[1]-1, decoding_strategy=decoding_strategy)
-                # print("---- GROUND TRUTH CAPTIONS ---- ", update_policy.clean_sentence(captions, data_loader)[:2])
-                # print("----- DISTRACTOR TRUTH CAPTIONS ---- ", update_policy.clean_sentence(dist_captions, data_loader)[:2])
-                # print("---- PREDICTED CAPTIONS ---- ", update_policy.clean_sentence(captions_pred, data_loader)[:2])
                 
                 prob_m_target_old = log_probs.sum(dim=-1)
-                print("###### P (M | T ) ##### ", prob_m_target_old)
-
-                prob_m_target, _ = drift_meter.semantic_drift(captions_pred, both_images)
-                print("###### P (M | T ) alternative with drift meter ##### ", prob_m_target)
+                
+                prob_m_target, _ = drift_meter.semantic_drift(captions_pred, both_images, return_batch_average=False)
                 # compute prob of message given distractor. for that, permute image features first
                 both_images_dist_first = torch.cat((distractor_features.unsqueeze(1), target_features.unsqueeze(1)), dim=1)
                 # use drift meter since it is equivalent to computing semantic drift 
-                prob_m_distractor, _ = drift_meter.semantic_drift(captions_pred, both_images_dist_first) # TODO probably i need to remove the mean reduction here
-                print("###### P (M | D) #### ", prob_m_distractor)
-
+                prob_m_distractor, _ = drift_meter.semantic_drift(captions_pred, both_images_dist_first, return_batch_average=False) # TODO probably i need to remove the mean reduction here
+            
                 #######
                 # CREATE TARGET DIST RANDOM PAIRS FOR THE LISTENER
                 targets_list = []
@@ -702,18 +651,12 @@ def play_game_wFixedListener(
                 probs1 = torch.stack(probs1_list)
                 probs2 = torch.stack(probs2_list)
 
-                # print("Probs1_list: ", probs1.shape)
-                # print("Probs2_list: ", probs2.shape)
                 
                 targets_list = torch.tensor(targets_list).to(device)
                 #######    
 
                 # pass images and generated message form speaker through listener
-                # hiddens_scores, hidden = listener_rnn(captions_pred)
-                # features = torch.cat((features1.unsqueeze(1), features2.unsqueeze(1)), dim=1)
-                # predictions, scores = listener_encoder(features, hidden.squeeze(0)) 
                 predictions = fixed_listener(probs1, probs2)
-                # print("Fixed listener predictions in main train loop : ", predictions)
                 ######
                 # RL step
                 # if target index and output index match, 1, else -1
@@ -736,33 +679,8 @@ def play_game_wFixedListener(
                 # combine structural loss and functional loss for the speaker 
                 # compute distribution under pretrained model
 
-                ###########
-                # KL divergence for regularization
-                ###########
-                # semantic_drift, pretrained_prob = drift_meter.semantic_drift(captions, both_images) 
-                # # should probably also be averaged over batch for mean batch loss reduction
-                # raw_outputs_probs = softmax(raw_outputs)
-                # raw_outputs_dist = torch.distributions.categorical.Categorical(probs=raw_outputs_probs)
-                # pretrained_prob_dist = torch.distributions.categorical.Categorical(probs=pretrained_prob)
-                # # KL divs of shape (batch_size,)
-                # # print("SHAPES OF PROB TENSORS")
-                # # print(raw_outputs_probs.shape)
-                # # print(pretrained_prob.shape)
-                # kl_div = torch.distributions.kl.kl_divergence(raw_outputs_dist, pretrained_prob_dist)
-                # # print("---- sentence level KL divergence ----- ", kl_div)
-                
-                # kl_div_sents = kl_div.mean(-1)
-                # kl_div_batch = kl_div_sents.mean().item()
-                # # print("---- batch level KL divergence ----- ", kl_div_batch)
-                # kl_divs.append(kl_div_batch)
-                # TODO double check + sign and whether the kl term requires grad
-                loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) #+ kl_coeff * kl_div_batch
+                loss_structural = criterion(raw_outputs.transpose(1,2), captions[:, 1:]) 
                 speaker_loss =  lambda_s*loss_structural + lambda_f*rl_grads
-                
-                # print("L_s: ", loss_structural, " L_f: ", rl_grads)
-                
-                # listener loss
-                # listener_loss = criterion(scores, targets_list)
                 
                 # Backward pass.
                 speaker_loss.backward(retain_graph=True)
@@ -770,17 +688,12 @@ def play_game_wFixedListener(
                 
                 # Update the parameters in the respective optimizer.
                 speaker_optimizer.step()
-                # listener_optimizer.step()
-
-                # scheduler_s.step()
-                # scheduler_l.step()
                 # Get training statistics.
                 stats = 'Epoch [%d/%d], Step [%d/%d], Speaker loss: %.4f, Perplexity: %5.4f, Accuracy: %.4f' % (epoch, num_epochs, j, total_steps, speaker_loss.item(), torch.exp(loss_structural), accuracy.item())
                 
                 speaker_losses_structural.append(loss_structural.item())
                 speaker_losses_functional.append(rl_grads.item())
                 speaker_losses.append(speaker_loss.item())
-                # listener_losses.append(listener_loss.item())
                 perplexities.append(torch.exp(loss_structural).item())
                 steps.append(i)
                 
@@ -822,8 +735,8 @@ def play_game_wFixedListener(
                     discrete_overlaps.extend(discrete_overlap)
                     image_similarities_val.extend(image_similarity_val)
                     
-                    speaker_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'speaker_baseline_randomPairs_fixedListener' + experiment + '_vocab49_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" + str(j) + "steps_" )
-                    torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
+                    # speaker_trained_file = os.path.join('../../data/final/reference_games/coco/models', 'speaker_baseline_randomPairs_fixedListener' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" + str(j) + "steps_" )
+                    # torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
                     # listener_rnn_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_rnn_baseline_randomPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" + str(j) + "steps_" )
                     # listener_encoder_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_encoder_baseline_randomPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" + str(j) + "steps_" )
                     # torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
@@ -833,26 +746,18 @@ def play_game_wFixedListener(
 
             # Save the weights.
             if epoch % save_every == 0:
-                speaker_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'speaker_baseline_fixedListener_randomPairs' + experiment + '_vocab49_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" )
+                speaker_trained_file = os.path.join('../../data/final/reference_games/coco/models', 'speaker_baseline_fixedListener_randomPairs' + experiment + '_vocab4000_' + str(lambda_s) + 'ls_' + decoding_strategy + "_decoding_" )
                 torch.save(speaker_decoder.state_dict(), speaker_trained_file + '%d.pkl' % epoch)
-                # listener_rnn_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_rnn_baseline_similarPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" )
-                # listener_encoder_trained_file = os.path.join('../../data/final/reference_games/3dshapes/models', 'listener_encoder_baseline_similarPairs' + experiment + '_vocab4000_' + 'ls_' + str(lambda_s) + decoding_strategy + "_decoding_" )
-                # torch.save(listener_rnn.state_dict(), listener_rnn_trained_file +'%d.pkl' % epoch)
-                # torch.save(listener_encoder.state_dict(), listener_encoder_trained_file+'%d.pkl' % epoch )
-
-                # torch.save(sanity_check_inds, "sanity_check_indices_refgame_final_baseline.pt")
+                
             # save the training metrics
             df_out = pd.DataFrame({
                 "steps": steps,
                 "speaker_s": speaker_losses_structural,
                 "speaker_f": speaker_losses_functional,
                 "speaker_loss": speaker_losses,
-                # "listener": listener_losses,
                 "perplexities": perplexities,
                 "accuracies": accuracies,
                 "image_similarities": image_similarities,
-                # "mean_mean_baselines": mean_baselines,
-                # "KL_divs": kl_divs,
             })
             df_out.to_csv(csv_out + "epoch_" + str(epoch) + ".csv", index=False )
             metrics_out = pd.DataFrame({

@@ -3,47 +3,6 @@ import os
 import torch
 from . import dataset_utils 
 
-
-
-def make_dataset(download_dir, filename, is_train):
-    """
-    Build torch dataset with images and captions.
-    Images are first sorted into categories, images from 40 categories are chosen,
-    then these are shuffled. 
-
-    Arguments:
-    --------
-        download_dir: str
-            Download directory where images and captions were donwloaded to
-        filename: str
-            File name prefix for reading captions json
-        is_train: bool
-            Flag is the split is train or val for constructing appropriate annotations file name     
-    Returns:
-    -----
-        dataset: tfds
-            Batched and suffled tfds instance of image + single caption pairs
-    """
-
-    print("Sorting images...")
-    # _sort_images_by_category(
-    #     download_dir=download_dir,
-    #     filename="instances",
-    #     is_train=is_train,
-    # )
-    print("Assign categories to images...")
-    # _get_image_categories(
-    #     download_dir=download_dir,
-    #     is_train=is_train,
-    # )
-    # load the records
-    # instantiate dataset here now 
-
-
-
-# Pass the list of images and the list of corresponding captions
-# train_dataset = make_dataset(list(train_data.keys()), list(train_data.values()))
-
 def get_loader(transform,
                num_imgs=0,
                pairs="random",
@@ -208,25 +167,8 @@ def get_loader_3dshapes(transform,
       cocoapi_loc: The location of the folder containing the COCO API: https://github.com/cocodataset/cocoapi
     """
     
-    # assert mode in ['train', 'test', 'val'], "mode must be one of 'train' or 'test'."
-    
-    # if vocab_from_file==False: assert mode=='train' or mode=='val', "To generate vocab from captions file, must be in training mode (mode='train')."
-
-    # # Based on mode (train, val, test), obtain img_folder and annotations_file.
-    # if mode == 'val':
-    #     if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-    #     img_folder = os.path.join(download_dir, "val2014/") 
-    #     annotations_file = os.path.join(download_dir, 'annotations/captions_val2014.json')
-    # if mode == 'train':
-    #     if vocab_from_file==True: assert os.path.exists(vocab_file), "vocab_file does not exist.  Change vocab_from_file to False to create vocab_file."
-    #     img_folder = os.path.join(download_dir, "train2014/") 
-    #     annotations_file = os.path.join(download_dir, 'annotations/captions_train2014.json')
-    # if mode == 'test':
-    #     assert batch_size==1, "Please change batch_size to 1 if testing your model."
-    #     assert os.path.exists(vocab_file), "Must first generate vocab.pkl from training data."
-    #     assert vocab_from_file==True, "Change vocab_from_file to True."
-    img_folder = os.path.join(download_dir, "") #'test2014/'
-    annotations_file = os.path.join(download_dir, '') #image_info_test2014
+    img_folder = os.path.join(download_dir, "") 
+    annotations_file = os.path.join(download_dir, '') 
 
     # TODO: alternatively, modify / sort the image IDS on the instantiated dataset.ids object 
     # COCO caption dataset.

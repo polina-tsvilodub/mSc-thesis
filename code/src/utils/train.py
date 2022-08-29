@@ -109,8 +109,7 @@ def validate_model(
             outputs_ind = softmax(outputs)
             max_probs, cat_samples = torch.max(outputs_ind, dim = -1)
             nl_caption = [[data_loader_val.dataset.vocab.idx2word[w.item()] for w in s] for s in cat_samples]
-            # nl_caption = [data_loader.dataset.vocab.idx2word[w.item()] for w in cat_samples]
-            nl_caption = [" ".join(nl_cap) for nl_cap in nl_caption] # " ".join(nl_caption)
+            nl_caption = [" ".join(nl_cap) for nl_cap in nl_caption] 
             structural_drift = drift_meter.structural_drift(nl_caption)
             structural_drifts.append(structural_drift.item())
             # also compute this for ground truth caption, as a reference value
@@ -208,8 +207,6 @@ def pretrain_speaker(
 
     # init drift meter for tracking structural drift for reference
     drift_meter = metrics.DriftMeter(
-        # semantic_encoder="models/encoder-earlystoppiing-4_semantic-drift.pkl", 
-        # semantic_decoder="models/decoder-3dshapes-512dim-47vocab-rs1234-wEmb-cont-5.pkl", 
         structural_model="transfo-xl-wt103",  
         embed_size=512, 
         vis_embed_size=512, 
@@ -298,15 +295,7 @@ def pretrain_speaker(
                     forcing_rate.append(use_teacher_forcing_rate)
                     train_type.append("auto_regression")
                     decoder.eval()
-                # print(f"doing self-regression for {target_captions.shape[1]} steps")
-                # start_caption = torch.tensor([0, 0]).repeat(data_loader.batch_sampler.batch_size, 1)
-                # for i in range(target_captions.shape[1] - 1):
-                #     tokens_outputs, hidden = decoder(both_images, start_caption, hidden)
-                #     print("SHAPE of LSTM out: ", outputs.shape)
-                #     pred_prob, pred_ind = torch.max(outputs, dim = -1)
-                #     # duplicate index for passing through the cutoff in the forward step
-                #     start_caption = torch.cat((pred_ind, pred_ind), dim = -1)
-                #     print("Duplicated predicted index: ", start_caption.shape)
+                
                     max_seq_length = target_captions.shape[1]-1
                     # t1 = perf_counter()
                     captions_pred, log_probs, outputs, entropies = decoder.sample(
