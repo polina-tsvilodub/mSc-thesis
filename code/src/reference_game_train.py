@@ -21,12 +21,12 @@ import argparse
 from dotenv import load_dotenv
 
 # set random seed
-torch.manual_seed(1234)
-random.seed(1234)
+# torch.manual_seed(1234)
+# random.seed(1234)
 
 load_dotenv()
 
-ex = sacred.Experiment("3dshapes_final_baseline_075_49_random")
+ex = sacred.Experiment("coco_final_baseline_1_4000_random")
 usr = os.getenv("MONGO_INITDB_ROOT_USERNAME")
 pw = os.getenv("MONGO_INITDB_ROOT_PASSWORD")
 db = os.getenv("MONGO_DATABASE")
@@ -95,11 +95,12 @@ def train_reference_game(
     EPOCHS = int(EPOCHS)#2#20 # number of training epochs
     PRINT_EVERY = 200 # window for printing average loss (steps)
     SAVE_EVERY = 1 # frequency of saving model weights (epochs)
-    LOG_FILE = LOG_FILE #'../../data/reference_game_coco_512dim_4000vocab_lf01_log.txt' # name of file with saved training loss and perplexity
+    LOG_FILE = LOG_FILE 
     MODE = 'train' # network mode
     WEIGHTS_PATH='../../data/models'
     NUM_VAL_IMGS=3700
 
+    global dataloader_exception_counter
     print("Beginning speaker pretraining script...")
 
     if EXPERIMENT == "coco":
@@ -216,17 +217,13 @@ def train_reference_game(
     
 
     print("NUMBER OF TRAIN IDX: ", len(data_loader_train.dataset.ids))
-    # print("NUMBER OF VAL IDX: ", len(data_loader_val.dataset.ids))
-    # print("NUMBER OF VAL caps: ", len(data_loader_val.dataset.caption_lengths))
-
+    
     # instantiate encoder, decoder, params
     # The size of the vocabulary.
     vocab_size = len(data_loader_train.dataset.vocab)
 
     print("VOCAB SIZE: ", vocab_size)
     # Initialize the encoder and decoder.
-    # Encoder projects the concatenation of the two images to the concatenation of the desired visual embedding size 
-    # speaker_encoder = EncoderMLP(2048, VISUAL_EMBED_SIZE)
     listener_encoder = ListenerEncoderCNN(LISTENER_EMBED_SIZE)
     # listener_encoder.load_state_dict(torch.load("models/listener-encoder-wPretrained-vocab4000-metrics-1.pkl"))
     # print("Model summaries:")
@@ -326,8 +323,9 @@ def train_reference_game(
             ex.log_scalar("loss_structural_train", value=loss_str_train[i], step=i)
             ex.log_scalar("loss_functional_train", value=loss_f_train[i], step=i)
             ex.log_scalar("perplexities_train", value=ppl_train[i], step=i)
-            ex.log_scalar("loss_listener_train", value=loss_l_train[i], step=i)
-            ex.log_scalar("listener_acc_train", value=acc_train[i], step=i)
+            if LISTENER_TYPE != "fixed":
+                ex.log_scalar("loss_listener_train", value=loss_l_train[i], step=i)
+                ex.log_scalar("listener_acc_train", value=acc_train[i], step=i)
             
         # dump val stats to sacred db
         for i in range(len(val_steps)):
